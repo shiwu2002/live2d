@@ -115,92 +115,141 @@ export const modelConfig: Record<string, ModelConfig> = {
 
 **重要**: 路径必须指向实际的 `.model3.json` 文件位置！
 
-## 🚀 自动检测新模型（高级功能）
+## 🚀 方法二：自动扫描模型（推荐）
 
-如果你有大量模型需要批量添加，可以创建一个脚本来自动扫描 `public/model/` 目录并生成配置。
+✅ **项目已实现完整的自动化扫描功能**
 
-### 创建扫描脚本
+如果你有大量模型需要批量添加，或希望每次添加新模型后自动更新配置，可以使用自动扫描脚本。
 
-创建 `scripts/scan-models.js`:
+### 1. 运行自动扫描
 
-```javascript
-const fs = require('fs');
-const path = require('path');
-
-const modelDir = path.join(__dirname, '../public/model');
-const configOutput = path.join(__dirname, '../src/config/auto-models.ts');
-
-// 递归查找 .model3.json 文件
-function findModelFiles(dir, basePath = '') {
-  const models = [];
-  const items = fs.readdirSync(dir);
-  
-  for (const item of items) {
-    const fullPath = path.join(dir, item);
-    const relativePath = path.join(basePath, item);
-    
-    if (fs.statSync(fullPath).isDirectory()) {
-      models.push(...findModelFiles(fullPath, relativePath));
-    } else if (item.endsWith('.model3.json')) {
-      models.push({
-        id: basePath.split(path.sep)[0] || item.replace('.model3.json', ''),
-        path: `/model/${relativePath.replace(/\\/g, '/')}`,
-        name: basePath.split(path.sep)[0] || item.replace('.model3.json', '')
-      });
-    }
-  }
-  
-  return models;
-}
-
-// 生成配置文件
-const models = findModelFiles(modelDir);
-const config = `// 此文件由脚本自动生成，请勿手动编辑
-// 运行 'node scripts/scan-models.js' 重新生成
-
-import { ModelConfig } from './models'
-
-export const autoDetectedModels: Record<string, ModelConfig> = {
-${models.map(m => `  '${m.id}': {
-    name: '${m.name}',
-    path: '${m.path}',
-  },`).join('\n')}
-}
-`;
-
-fs.writeFileSync(configOutput, config, 'utf-8');
-console.log(`✅ 已检测到 ${models.length} 个模型`);
-console.log(`📝 配置已写入: ${configOutput}`);
+```bash
+npm run scan-models
 ```
 
-### 在 package.json 中添加脚本
+脚本会自动：
+- 🔍 递归扫描 `public/model/` 目录
+- 📝 查找所有 `.model3.json` 文件
+- ✨ 智能处理 `runtime` 子目录结构
+- 📄 生成 `src/config/auto-models.ts` 配置文件
+- 📊 输出扫描结果和统计信息
 
-```json
-{
-  "scripts": {
-    "scan-models": "node scripts/scan-models.js"
-  }
-}
+### 2. 扫描输出示例
+
+```
+🔍 开始扫描 Live2D 模型...
+
+📁 扫描目录: D:\vue\live2d\public\model
+
+✅ 找到 10 个模型文件:
+
+   • biaoqiang_3
+     名称: Biaoqiang 3
+     路径: /model/biaoqiang_3/biaoqiang_3.model3.json
+
+   • chitose
+     名称: Chitose
+     路径: /model/chitose/runtime/chitose.model3.json
+   
+   ... (更多模型)
+
+✅ 配置文件已生成: src\config\auto-models.ts
+📊 总计: 10 个模型
 ```
 
-### 使用自动生成的配置
+### 3. 使用自动生成的配置
 
-在 `src/config/models.ts` 中导入自动检测的模型：
+自动生成的 `src/config/auto-models.ts` 文件包含：
 
 ```typescript
-import { autoDetectedModels } from './auto-models'
+export const autoModelConfig: Record<string, ModelConfig> = {
+  biaoqiang_3: {
+    name: 'Biaoqiang 3',
+    path: '/model/biaoqiang_3/biaoqiang_3.model3.json',
+    description: '自动检测的模型'
+  },
+  chitose: {
+    name: 'Chitose',
+    path: '/model/chitose/runtime/chitose.model3.json',
+    description: '自动检测的模型'
+  },
+  // ... 其他模型
+}
+```
+
+**方式一：直接使用自动配置**
+
+在 `src/App.vue` 中：
+
+```typescript
+// 替换导入
+import { autoModelConfig, getAutoModelIds } from './config/auto-models'
+
+// 使用自动配置
+const availableModels = getAutoModelIds()
+const modelPath = computed(() => autoModelConfig[currentModel.value]?.path || '')
+```
+
+**方式二：合并手动和自动配置**
+
+在 `src/config/models.ts` 中：
+
+```typescript
+import { autoModelConfig } from './auto-models'
 
 export const modelConfig: Record<string, ModelConfig> = {
-  // 手动配置的模型（优先级更高，可以覆盖自动检测的配置）
+  // 手动配置的模型（可覆盖自动检测的配置，添加自定义名称和描述）
   biaoqiang_3: {
     name: '标枪',
     path: '/model/biaoqiang_3/biaoqiang_3.model3.json',
     description: '战舰少女 - 标枪'
   },
   
-  // 合并自动检测的模型
-  ...autoDetectedModels,
+  // 合并自动检测的其他模型
+  ...autoModelConfig,
 }
+```
+
+### 4. 添加新模型的自动化流程
+
+1. **放置模型文件**
+   ```bash
+   # 将新模型放入 public/model/ 目录
+   public/model/new_model/
+   └── new_model.model3.json
+   ```
+
+2. **运行扫描脚本**
+   ```bash
+   npm run scan-models
+   ```
+
+3. **完成！** 
+   - 新模型会自动添加到配置文件
+   - 刷新浏览器即可看到新模型
+
+### 5. 脚本特性
+
+✨ **智能 ID 生成**
+- 使用模型文件夹名作为 ID
+- 自动处理 `runtime` 子目录（使用父目录名）
+- 清理特殊字符，确保 ID 有效
+
+✨ **友好的名称生成**
+- 自动美化模型名称
+- 将下划线转换为空格
+- 首字母大写
+
+✨ **辅助函数**
+```typescript
+// 获取所有模型 ID
+getAutoModelIds(): string[]
+
+// 获取模型数量
+getAutoModelCount(): number
+
+// 检查模型是否存在
+hasAutoModel(id: string): boolean
 ```
 
 ## ⚠️ 常见问题
