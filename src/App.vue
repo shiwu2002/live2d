@@ -4,10 +4,13 @@
     <div class="main-content">
       <h1>Live2D 小窗口展示</h1>
       <p>模型会固定在右下角的小窗口中展示，可以切换不同的模型</p>
+      <p v-if="discoveredModels.length > 0" class="model-count">
+        已自动发现 {{ discoveredModels.length }} 个可用模型
+      </p>
     </div>
 
     <!-- 固定的 Live2D 小窗口 -->
-    <div class="live2d-widget">
+    <div class="live2d-widget" v-if="discoveredModels.length > 0">
       <div class="widget-header">
         <span class="widget-title">{{ currentModelName }}</span>
         <button class="close-btn" @click="toggleWidget" :title="isWidgetVisible ? '隐藏' : '显示'">
@@ -17,6 +20,7 @@
       
       <div class="widget-body" v-show="isWidgetVisible">
         <Live2DModel
+          v-if="modelPath"
           :key="currentModel"
           :modelPath="modelPath"
           :width="widgetWidth"
@@ -25,36 +29,57 @@
       </div>
       
       <div class="widget-controls" v-show="isWidgetVisible">
-        <select v-model="currentModel" @change="handleModelChange" class="model-selector">
-          <option 
-            v-for="modelId in availableModels" 
-            :key="modelId" 
-            :value="modelId"
-          >
-            {{ modelConfig[modelId]?.name || modelId }}
+        <select v-model="currentModel" class="model-selector">
+          <option v-for="model in discoveredModels" :key="model.id" :value="model.id">
+            {{ model.name }}
           </option>
         </select>
       </div>
+    </div>
+
+    <!-- 加载提示 -->
+    <div class="loading-tip" v-else>
+      <p>正在扫描模型...</p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import Live2DModel from './components/Live2DModel.vue'
-import { modelConfig, getModelIds } from './config/models'
+import { autoModelConfig, getAutoModelIds } from './config/auto-models'
 
-// 获取所有可用的模型 ID
-const availableModels = getModelIds()
+// 模型信息接口
+interface ModelInfo {
+  id: string
+  name: string
+  path: string
+}
 
-// 当前选中的模型
-const currentModel = ref(availableModels[0] || 'biaoqiang_3')
+// 从自动生成的配置中获取模型列表
+const discoveredModels = computed<ModelInfo[]>(() => {
+  const modelIds = getAutoModelIds()
+  return modelIds.map(id => ({
+    id,
+    name: id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    path: autoModelConfig[id].path
+  }))
+})
+
+// 当前选中的模型 ID
+const currentModel = ref<string>('')
 
 // 计算当前模型路径
-const modelPath = computed(() => modelConfig[currentModel.value]?.path || '')
+const modelPath = computed(() => {
+  const model = discoveredModels.value.find(m => m.id === currentModel.value)
+  return model ? model.path : ''
+})
 
-// 计算当前模型显示名称
-const currentModelName = computed(() => modelConfig[currentModel.value]?.name || '未知模型')
+// 获取当前模型显示名称
+const currentModelName = computed(() => {
+  const model = discoveredModels.value.find(m => m.id === currentModel.value)
+  return model ? model.name : '加载中...'
+})
 
 // 小窗口配置 - 固定尺寸，适合 Live2D 模型显示比例
 const widgetWidth = ref(300)
@@ -63,14 +88,25 @@ const widgetHeight = ref(400)
 // 小窗口显示状态
 const isWidgetVisible = ref(true)
 
-// 模型切换处理
-const handleModelChange = () => {
-  console.log('切换模型:', currentModel.value)
-}
+// 监听模型变化并输出日志
+watch(currentModel, (newModel, oldModel) => {
+  if (newModel !== oldModel) {
+    console.log(`模型切换: ${oldModel} -> ${newModel}`)
+    console.log(`当前模型名称: ${currentModelName.value}`)
+    console.log(`当前模型路径: ${modelPath.value}`)
+  }
+})
 
 // 切换小窗口显示/隐藏
 const toggleWidget = () => {
   isWidgetVisible.value = !isWidgetVisible.value
+}
+
+// 初始化：设置默认模型
+const modelIds = getAutoModelIds()
+if (modelIds.length > 0) {
+  currentModel.value = modelIds[0] || ''
+  console.log(`已加载 ${modelIds.length} 个模型，当前模型: ${modelIds[0]}`)
 }
 </script>
 
@@ -104,6 +140,25 @@ const toggleWidget = () => {
   font-size: 1.2rem;
   max-width: 600px;
   line-height: 1.6;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.model-count {
+  margin-top: 1rem;
+  font-size: 1rem;
+  opacity: 0.9;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 8px 16px;
+  border-radius: 20px;
+}
+
+.loading-tip {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 1.2rem;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
 }
 

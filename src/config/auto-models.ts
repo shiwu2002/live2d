@@ -1,6 +1,6 @@
 /**
  * Live2D 模型配置文件（自动生成）
- * 生成时间: 2026-01-08T17:19:50.413Z
+ * 生成时间: 2026-01-08T17:34:25.984Z
  * 
  * ⚠️ 警告：此文件由 scripts/scan-models.js 自动生成
  * 如需修改配置，请编辑 src/config/models.ts 或重新运行扫描脚本
@@ -13,16 +13,6 @@ export interface ModelConfig {
 }
 
 export const autoModelConfig: Record<string, ModelConfig> = {
-  banerwei_3: {
-    name: 'Banerwei 3',
-    path: '/model/banerwei_3/banerwei_3.model3.json',
-    description: '自动检测的模型'
-  },
-  biaoqiang_3: {
-    name: 'Biaoqiang 3',
-    path: '/model/biaoqiang_3/biaoqiang_3.model3.json',
-    description: '自动检测的模型'
-  },
   chitose: {
     name: 'Chitose',
     path: '/model/chitose/runtime/chitose.model3.json',
