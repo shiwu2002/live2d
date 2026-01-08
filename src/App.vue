@@ -9,7 +9,7 @@
     <!-- 固定的 Live2D 小窗口 -->
     <div class="live2d-widget">
       <div class="widget-header">
-        <span class="widget-title">{{ modelNames[currentModel] }}</span>
+        <span class="widget-title">{{ currentModelName }}</span>
         <button class="close-btn" @click="toggleWidget" :title="isWidgetVisible ? '隐藏' : '显示'">
           {{ isWidgetVisible ? '−' : '+' }}
         </button>
@@ -26,8 +26,13 @@
       
       <div class="widget-controls" v-show="isWidgetVisible">
         <select v-model="currentModel" @change="handleModelChange" class="model-selector">
-          <option value="biaoqiang_3">标枪</option>
-          <option value="banerwei_3">班纳维</option>
+          <option 
+            v-for="modelId in availableModels" 
+            :key="modelId" 
+            :value="modelId"
+          >
+            {{ modelConfig[modelId]?.name || modelId }}
+          </option>
         </select>
       </div>
     </div>
@@ -37,24 +42,19 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import Live2DModel from './components/Live2DModel.vue'
+import { modelConfig, getModelIds } from './config/models'
 
-// 可用的模型配置
-const models = {
-  biaoqiang_3: '/model/biaoqiang_3/biaoqiang_3.model3.json',
-  banerwei_3: '/model/banerwei_3/banerwei_3.model3.json'
-}
-
-// 模型显示名称
-const modelNames = {
-  biaoqiang_3: '标枪',
-  banerwei_3: '班纳维'
-}
+// 获取所有可用的模型 ID
+const availableModels = getModelIds()
 
 // 当前选中的模型
-const currentModel = ref<keyof typeof models>('biaoqiang_3')
+const currentModel = ref(availableModels[0] || 'biaoqiang_3')
 
 // 计算当前模型路径
-const modelPath = computed(() => models[currentModel.value])
+const modelPath = computed(() => modelConfig[currentModel.value]?.path || '')
+
+// 计算当前模型显示名称
+const currentModelName = computed(() => modelConfig[currentModel.value]?.name || '未知模型')
 
 // 小窗口配置 - 固定尺寸，适合 Live2D 模型显示比例
 const widgetWidth = ref(300)
