@@ -45,15 +45,14 @@ const initPixiApp = () => {
   const height = props.height || window.innerHeight
 
   app = new Application({
-    width: width * 2,
-    height: height * 2,
+    width: width,
+    height: height,
     backgroundAlpha: 0,
     preserveDrawingBuffer: true,
-    autoDensity: false,
-    resolution: 1,
+    autoDensity: true,
+    resolution: window.devicePixelRatio || 1,
   })
 
-  app.stage.scale.set(2)
   canvasContainer.value.appendChild(app.view as HTMLCanvasElement)
 }
 
@@ -68,18 +67,46 @@ const loadModel = async () => {
 
     app.stage.addChild(model)
 
-    // 设置模型位置和缩放
+    // 设置模型锚点为中心
     model.anchor.set(0.5, 0.5)
-    model.x = props.x || (app.screen.width / 4)
-    model.y = props.y || (app.screen.height / 2)
-    model.scale.set(props.scale || 0.3)
+
+    // 如果提供了自定义位置和缩放，使用自定义值
+    if (props.x !== undefined && props.y !== undefined && props.scale !== undefined) {
+      model.x = props.x
+      model.y = props.y
+      model.scale.set(props.scale)
+    } else {
+      // 自动计算模型缩放和位置以适应容器
+      const containerWidth = app.screen.width
+      const containerHeight = app.screen.height
+
+      // 获取模型原始尺寸
+      const modelWidth = model.width
+      const modelHeight = model.height
+
+      // 计算缩放比例，确保模型完整显示在容器内，留出20%边距
+      const scaleX = (containerWidth * 0.8) / modelWidth
+      const scaleY = (containerHeight * 0.8) / modelHeight
+      const optimalScale = Math.min(scaleX, scaleY)
+
+      // 应用缩放
+      model.scale.set(optimalScale)
+
+      // 设置模型位置为容器正中心
+      model.x = containerWidth / 2
+      model.y = containerHeight / 2
+    }
 
     // 播放默认动画
     if (model.internalModel.motionManager) {
       await model.motion('idle', 0)
     }
 
-    console.log('Live2D 模型加载成功')
+    console.log('Live2D 模型加载成功', {
+      modelSize: { width: model.width, height: model.height },
+      scale: model.scale.x,
+      position: { x: model.x, y: model.y }
+    })
   } catch (error) {
     console.error('Live2D 模型加载失败:', error)
   }
@@ -122,11 +149,11 @@ const updateBlink = (deltaTime: number) => {
 
 // 鼠标跟随
 const handleMouseMove = (event: MouseEvent) => {
-  if (!model || !canvasContainer.value) return
+  if (!model || !canvasContainer.value || !app) return
 
   const rect = canvasContainer.value.getBoundingClientRect()
-  const x = (event.clientX - rect.left) * 2
-  const y = (event.clientY - rect.top) * 2
+  const x = ((event.clientX - rect.left) / rect.width) * app.screen.width
+  const y = ((event.clientY - rect.top) / rect.height) * app.screen.height
 
   model.focus(x, y)
 }
