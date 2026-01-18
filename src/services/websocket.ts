@@ -14,6 +14,10 @@ export type ControlCommand =
   | 'voice_call_accept'
   | 'voice_call_reject'
   | 'voice_call_end'
+  | 'start_recording'
+  | 'stop_recording'
+  | 'start_recognition'
+  | 'interrupt'
 
 // 基础消息接口
 export interface BaseMessage {
@@ -100,8 +104,8 @@ export class WebSocketService {
     // 根据模式选择端点
     const endpoint = mode === 'voice' ? '/ws/voice' : '/ws/chat'
     
-    // 构建基础 URL
-    let url = `${baseUrl}${endpoint}`
+    // 检查baseUrl是否已经包含端点路径，避免重复
+    let url = baseUrl.endsWith(endpoint) ? baseUrl : `${baseUrl}${endpoint}`
     
     // 添加认证参数
     const params = new URLSearchParams()
@@ -301,15 +305,8 @@ export class WebSocketService {
       // 直接发送二进制数据
       this.ws!.send(audioData)
       
-      // 本地回显
-      const message: AudioMessage = {
-        type: 'AUDIO',
-        content: audioData,
-        sender: 'user',
-        timestamp: Date.now(),
-        id: this.generateId()
-      }
-      this.notifyMessage(message)
+      // 注意：语音模式下不需要本地回显音频数据
+      // 只有后端返回的TTS音频才需要播放
       
       return true
     } catch (error) {
@@ -322,7 +319,7 @@ export class WebSocketService {
   /**
    * 发送控制消息
    */
-  sendControl(command: ControlCommand, data?: any): boolean {
+  sendControl(command: ControlCommand): boolean {
     if (!this.isConnected()) {
       console.error('WebSocket 未连接')
       return false

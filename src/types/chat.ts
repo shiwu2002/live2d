@@ -5,7 +5,6 @@
 import type { 
   ChatMessage, 
   MessageType,
-  AudioMessage as BaseAudioMessage,
   TextMessage,
   ImageMessage,
   ControlMessage,

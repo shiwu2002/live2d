@@ -167,7 +167,6 @@ import { WebSocketService, type WebSocketConfig } from '../services/websocket'
 import type { ExtendedChatMessage } from '../types/chat'
 import { AudioRecorder, AudioPlayer, AudioUtils } from '../services/audio'
 import { 
-  isDisplayableMessage, 
   getTextContent, 
   getImageUrls, 
   getControlText 
