@@ -64,8 +64,8 @@ export interface AudioConfig {
 // 开发环境配置
 const developmentConfig: EnvConfig = {
   env: 'development',
-  apiBaseUrl: 'http://localhost:80',
-  wsBaseUrl: 'ws://localhost:80',
+  apiBaseUrl: 'http://localhost:8088',
+  wsBaseUrl: 'ws://localhost:8088',
   wsEndpoints: {
     chat: '/ws/chat',
     voice: '/ws/voice',
@@ -77,8 +77,8 @@ const developmentConfig: EnvConfig = {
 const productionConfig: EnvConfig = {
   env: 'production',
   // 生产环境地址（部署时需要修改）
-  apiBaseUrl: 'https://118.31.118.176',
-  wsBaseUrl: 'wss://118.31.118.176',  // 使用 wss:// 协议，Nginx 会代理转换为 ws://
+  apiBaseUrl: 'https://118.31.118.176:80',
+  wsBaseUrl: 'wss://118.31.118.176:80',  // 使用 wss:// 协议，Nginx 会代理转换为 ws://
   wsEndpoints: {
     chat: '/ws/chat',
     voice: '/ws/voice',

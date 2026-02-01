@@ -19,54 +19,54 @@ export const modelConfig: Record<string, ModelConfig> = {
   // 战舰少女模型
   biaoqiang_3: {
     name: '标枪',
-    path: '/model/biaoqiang_3/biaoqiang_3.model3.json',
+    path: 'model/biaoqiang_3/biaoqiang_3.model3.json',
     description: '战舰少女 - 标枪'
   },
   banerwei_3: {
     name: '班纳维',
-    path: '/model/banerwei_3/banerwei_3.model3.json',
+    path: 'model/banerwei_3/banerwei_3.model3.json',
     description: '战舰少女 - 班纳维'
   },
 
   // Live2D 官方示例模型
   chitose: {
     name: '千岁',
-    path: '/model/chitose/runtime/chitose.model3.json',
+    path: 'model/chitose/runtime/chitose.model3.json',
     description: 'Live2D 官方示例 - 千岁'
   },
   epsilon: {
     name: 'Epsilon',
-    path: '/model/Epsilon/runtime/Epsilon.model3.json',
+    path: 'model/Epsilon/runtime/Epsilon.model3.json',
     description: 'Live2D 官方示例 - Epsilon'
   },
   gantzert: {
     name: 'Gantzert Felixander',
-    path: '/model/Gantzert_Felixander/runtime/Gantzert_Felixander.model3.json',
+    path: 'model/Gantzert_Felixander/runtime/Gantzert_Felixander.model3.json',
     description: 'Live2D 官方示例 - Gantzert Felixander'
   },
   haru: {
     name: 'Haru',
-    path: '/model/haru/runtime/haru.model3.json',
+    path: 'model/haru/runtime/haru.model3.json',
     description: 'Live2D 官方示例 - Haru'
   },
   haru_greeter: {
     name: 'Haru Greeter',
-    path: '/model/haru_greeter_pro_jp/runtime/haru_greeter_t03.model3.json',
+    path: 'model/haru_greeter_pro_jp/runtime/haru_greeter_t03.model3.json',
     description: 'Live2D 官方示例 - Haru Greeter'
   },
   hiyori: {
     name: 'Hiyori',
-    path: '/model/hiyori_pro_zh/runtime/hiyori_pro_t10.model3.json',
+    path: 'model/hiyori_pro_zh/runtime/hiyori_pro_t10.model3.json',
     description: 'Live2D 官方示例 - Hiyori'
   },
   miku: {
     name: '初音未来',
-    path: '/model/miku_pro_jp/runtime/miku_sample_t04.model3.json',
+    path: 'model/miku_pro_jp/runtime/miku_sample_t04.model3.json',
     description: 'Live2D 官方示例 - 初音未来'
   },
   natori: {
     name: 'Natori',
-    path: '/model/natori_pro_jp/runtime/natori_pro_t04.model3.json',
+    path: 'model/natori_pro_jp/runtime/natori_pro_t04.model3.json',
     description: 'Live2D 官方示例 - Natori'
   },
 
