@@ -77,8 +77,8 @@ const developmentConfig: EnvConfig = {
 const productionConfig: EnvConfig = {
   env: 'production',
   // 生产环境地址（部署时需要修改）
-  apiBaseUrl: 'https://118.31.118.176',
-  wsBaseUrl: 'wss://118.31.118.176',  // 使用 wss:// 协议，Nginx 会代理转换为 ws://
+  apiBaseUrl: 'https://shiwu.shop',
+  wsBaseUrl: 'wss://shiwu.shop',  // 使用 wss:// 协议，Nginx 会代理转换为 ws://
   wsEndpoints: {
     chat: '/ws/chat',
     voice: '/ws/voice',
@@ -91,7 +91,7 @@ const productionConfig: EnvConfig = {
 // 默认聊天配置
 export const defaultChatConfig: ChatConfig = {
   // WebSocket 服务器地址（通过 getWebSocketUrl 动态获取）
-  baseUrl: 'wss://118.31.118.176',  // 使用 wss:// 协议
+  baseUrl: 'wss://shiwu.shop',  // 使用 wss:// 协议
   
   // 用户唯一标识（实际使用时应从登录系统获取）
   openid: 'test_user_001',
