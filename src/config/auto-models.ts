@@ -15,42 +15,42 @@ export interface ModelConfig {
 export const autoModelConfig: Record<string, ModelConfig> = {
   chitose: {
     name: 'Chitose',
-    path: '/model/chitose/runtime/chitose.model3.json',
+    path: 'model/chitose/runtime/chitose.model3.json',
     description: '自动检测的模型'
   },
   Epsilon: {
     name: 'Epsilon',
-    path: '/model/Epsilon/runtime/Epsilon.model3.json',
+    path: 'model/Epsilon/runtime/Epsilon.model3.json',
     description: '自动检测的模型'
   },
   Gantzert_Felixander: {
     name: 'Gantzert Felixander',
-    path: '/model/Gantzert_Felixander/runtime/Gantzert_Felixander.model3.json',
+    path: 'model/Gantzert_Felixander/runtime/Gantzert_Felixander.model3.json',
     description: '自动检测的模型'
   },
   haru: {
     name: 'Haru',
-    path: '/model/haru/runtime/haru.model3.json',
+    path: 'model/haru/runtime/haru.model3.json',
     description: '自动检测的模型'
   },
   haru_greeter_pro_jp: {
     name: 'Haru Greeter T03',
-    path: '/model/haru_greeter_pro_jp/runtime/haru_greeter_t03.model3.json',
+    path: 'model/haru_greeter_pro_jp/runtime/haru_greeter_t03.model3.json',
     description: '自动检测的模型'
   },
   hiyori_pro_zh: {
     name: 'Hiyori Pro T10',
-    path: '/model/hiyori_pro_zh/runtime/hiyori_pro_t10.model3.json',
+    path: 'model/hiyori_pro_zh/runtime/hiyori_pro_t10.model3.json',
     description: '自动检测的模型'
   },
   miku_pro_jp: {
     name: 'Miku Sample T04',
-    path: '/model/miku_pro_jp/runtime/miku_sample_t04.model3.json',
+    path: 'model/miku_pro_jp/runtime/miku_sample_t04.model3.json',
     description: '自动检测的模型'
   },
   natori_pro_jp: {
     name: 'Natori Pro T04',
-    path: '/model/natori_pro_jp/runtime/natori_pro_t04.model3.json',
+    path: 'model/natori_pro_jp/runtime/natori_pro_t04.model3.json',
     description: '自动检测的模型'
   }
 }
