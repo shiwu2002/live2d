@@ -92,6 +92,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { createQRCodeLoginService } from '../services/qrcodeLogin'
 import { QRCodeLoginStatus } from '../types/login'
 import type { QRCodeInfo, UserLoginInfo } from '../types/login'
+import { getWebSocketUrl } from '../config'
 
 // Props
 interface Props {
@@ -100,7 +101,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  wsUrl: 'ws://localhost:8080/ws/qrcode-login'
+  wsUrl: getWebSocketUrl('qrcodeLogin')
 })
 
 // Emits

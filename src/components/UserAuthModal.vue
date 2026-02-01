@@ -127,6 +127,7 @@
 import { ref, computed, watch } from 'vue'
 import { authService } from '../services/authService'
 import type { LoginRequest, RegisterRequest, UserInfo } from '../types/login'
+import { getApiBaseUrl } from '../config'
 
 // Props
 interface Props {
@@ -135,7 +136,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  apiBaseUrl: 'http://localhost:8080'
+  apiBaseUrl: getApiBaseUrl()
 })
 
 // Emits
