@@ -669,7 +669,7 @@ logEnvConfig()
   }
   
   .widget-header {
-    position: absolute;
+    position: fixed;
     top: 10px;
     left: 10px;
     right: 10px;
@@ -699,7 +699,7 @@ logEnvConfig()
   }
   
   .widget-controls {
-    position: absolute;
+    position: fixed;
     top: 60px;
     left: 10px;
     right: 10px;
@@ -708,6 +708,7 @@ logEnvConfig()
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
     border-radius: 12px;
+    border: none;
   }
   
   .model-selector {
@@ -717,8 +718,8 @@ logEnvConfig()
   
   /* 控制面板 - 放在模型选择器下方 */
   .control-panel {
-    position: absolute;
-    top: 120px;
+    position: fixed;
+    top: 118px;
     left: 10px;
     right: 10px;
     bottom: auto;
@@ -734,19 +735,20 @@ logEnvConfig()
     flex-wrap: wrap;
     gap: 8px;
     justify-content: center;
+    max-width: 100%;
   }
   
   .control-btn {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     font-size: 18px;
-    border-radius: 8px;
+    border-radius: 10px;
   }
   
   /* 用户信息面板 - 放在控制面板下方 */
   .user-info-panel {
-    position: absolute;
-    top: 190px;
+    position: fixed;
+    top: 200px;
     left: 10px;
     right: 10px;
     bottom: auto;
