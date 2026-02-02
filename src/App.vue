@@ -421,7 +421,7 @@ logEnvConfig()
   position: fixed;
   bottom: 20px;
   right: 20px;
-  width: 300px;
+  width: 320px;
   background: rgba(255, 255, 255, 0.98);
   border-radius: 16px;
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25);
@@ -515,12 +515,12 @@ logEnvConfig()
 .control-panel {
   position: fixed;
   bottom: 20px;
-  right: 340px; /* 小窗口宽度300px + 间距20px + 边距20px */
+  right: 360px; /* 小窗口宽度320px + 间距20px + 边距20px */
   background: rgba(255, 255, 255, 0.98);
   border-radius: 16px;
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25);
   backdrop-filter: blur(10px);
-  padding: 16px;
+  padding: 12px;
   z-index: 999;
   transition: all 0.3s ease;
   border: 2px solid rgba(102, 126, 234, 0.2);
@@ -533,19 +533,21 @@ logEnvConfig()
 
 .control-buttons {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 280px;
 }
 
 .control-btn {
-  width: 56px;
-  height: 56px;
+  width: 48px;
+  height: 48px;
   border: none;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  border-radius: 12px;
+  border-radius: 10px;
   cursor: pointer;
-  font-size: 24px;
+  font-size: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -654,44 +656,118 @@ logEnvConfig()
 
 /* 响应式设计 */
 @media (max-width: 768px) {
+  /* Live2D小窗口 - 全屏布局 */
   .live2d-widget {
-    width: 280px;
-    bottom: 10px;
-    right: 10px;
+    width: 100vw;
+    height: 100vh;
+    bottom: 0;
+    right: 0;
+    top: 0;
+    left: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
   
-  .widget-body {
-    height: 360px;
-  }
-  
-  .control-panel {
-    right: 300px;
-    padding: 12px;
-  }
-  
-  .control-btn {
-    width: 48px;
-    height: 48px;
-    font-size: 20px;
-  }
-  
-  .user-info-panel {
+  .widget-header {
+    position: absolute;
     top: 10px;
+    left: 10px;
     right: 10px;
-    padding: 12px 16px;
+    z-index: 10;
+    padding: 8px 12px;
+    border-radius: 12px;
+    background: rgba(102, 126, 234, 0.95);
+    backdrop-filter: blur(10px);
   }
   
-  .user-avatar {
-    width: 40px;
-    height: 40px;
-  }
-  
-  .user-nickname {
+  .widget-title {
     font-size: 14px;
   }
   
+  .close-btn {
+    width: 24px;
+    height: 24px;
+    font-size: 16px;
+  }
+  
+  .widget-body {
+    width: 100vw;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+  }
+  
+  .widget-controls {
+    position: absolute;
+    top: 60px;
+    left: 10px;
+    right: 10px;
+    z-index: 10;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+  }
+  
+  .model-selector {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  
+  /* 控制面板 - 放在模型选择器下方 */
+  .control-panel {
+    position: absolute;
+    top: 120px;
+    left: 10px;
+    right: 10px;
+    bottom: auto;
+    z-index: 10;
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+  }
+  
+  .control-buttons {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+  
+  .control-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+    border-radius: 8px;
+  }
+  
+  /* 用户信息面板 - 放在控制面板下方 */
+  .user-info-panel {
+    position: absolute;
+    top: 190px;
+    left: 10px;
+    right: 10px;
+    bottom: auto;
+    z-index: 10;
+    padding: 8px 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+  }
+  
+  .user-avatar {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .user-nickname {
+    font-size: 13px;
+  }
+  
   .user-id {
-    font-size: 11px;
+    font-size: 10px;
   }
   
   .main-content h1 {
