@@ -64,8 +64,9 @@ export interface AudioConfig {
 // 开发环境配置
 const developmentConfig: EnvConfig = {
   env: 'development',
-  apiBaseUrl: 'http://localhost:8088',
-  wsBaseUrl: 'ws://localhost:8088',
+  // 开发环境使用代理，直接访问本地路径，由 Vite 代理转发
+  apiBaseUrl: '',
+  wsBaseUrl: '',
   wsEndpoints: {
     chat: '/ws/chat',
     voice: '/ws/voice',

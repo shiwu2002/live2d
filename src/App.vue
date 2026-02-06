@@ -22,14 +22,6 @@
       @close="showVoiceCall = false"
     />
 
-    <!-- 扫码登录窗口 -->
-    <QRCodeLogin
-      :visible="showQRCodeLogin"
-      :ws-url="qrcodeLoginWsUrl"
-      @close="showQRCodeLogin = false"
-      @login-success="handleLoginSuccess"
-      @login-failed="handleLoginFailed"
-    />
 
     <!-- 用户名密码登录注册窗口 -->
     <UserAuthModal
@@ -40,12 +32,48 @@
     />
 
     <!-- 固定的 Live2D 小窗口 -->
-    <div class="live2d-widget" v-if="discoveredModels.length > 0">
-      <div class="widget-header">
+    <div class="live2d-widget" v-if="discoveredModels.length > 0" :style="widgetStyle">
+      <div class="widget-header" @mousedown="startWidgetDrag">
         <span class="widget-title">{{ currentModelName }}</span>
         <button class="close-btn" @click="toggleWidget" :title="isWidgetVisible ? '隐藏' : '显示'">
           {{ isWidgetVisible ? '−' : '+' }}
         </button>
+      </div>
+      
+      <div class="widget-toolbar" v-show="isWidgetVisible">
+        <div class="toolbar-buttons">
+          <button 
+            v-if="!isLoggedIn" 
+            class="control-btn login-btn" 
+            @click="toggleUserAuthModal" 
+            title="账号密码登录"
+          >
+            <span>🔐</span>
+          </button>
+          <button 
+            v-else 
+            class="control-btn logout-btn" 
+            @click="handleLogout" 
+            :title="`${currentUser?.nickname || '用户'} - 退出登录`"
+          >
+            <span>👤</span>
+          </button>
+          <button class="control-btn" @click="toggleChat" title="聊天窗口">
+            <span>💬</span>
+          </button>
+          <button class="control-btn" @click="toggleVoiceCall" title="语音通话">
+            <span>🎤</span>
+          </button>
+          <button class="control-btn" @click="playRandomMotion" title="随机动作">
+            <span>🎭</span>
+          </button>
+          <button class="control-btn" @click="changeExpression" title="切换表情">
+            <span>😊</span>
+          </button>
+          <button class="control-btn" @click="toggleWidget" title="显示/隐藏">
+            <span>{{ isWidgetVisible ? '👁️' : '👁️‍🗨️' }}</span>
+          </button>
+        </div>
       </div>
       
       <div class="widget-body" v-show="isWidgetVisible">
@@ -67,50 +95,6 @@
       </div>
     </div>
     
-    <!-- 控制台按钮面板 -->
-    <div class="control-panel" v-if="discoveredModels.length > 0">
-      <div class="control-buttons">
-        <button 
-          v-if="!isLoggedIn" 
-          class="control-btn login-btn" 
-          @click="toggleUserAuthModal" 
-          title="账号密码登录"
-        >
-          <span>🔐</span>
-        </button>
-        <button 
-          v-if="!isLoggedIn" 
-          class="control-btn qrcode-btn" 
-          @click="toggleQRCodeLogin" 
-          title="扫码登录"
-        >
-          <span>📱</span>
-        </button>
-        <button 
-          v-else 
-          class="control-btn logout-btn" 
-          @click="handleLogout" 
-          :title="`${currentUser?.nickname || '用户'} - 退出登录`"
-        >
-          <span>👤</span>
-        </button>
-        <button class="control-btn" @click="toggleChat" title="聊天窗口">
-          <span>💬</span>
-        </button>
-        <button class="control-btn" @click="toggleVoiceCall" title="语音通话">
-          <span>🎤</span>
-        </button>
-        <button class="control-btn" @click="playRandomMotion" title="随机动作">
-          <span>🎭</span>
-        </button>
-        <button class="control-btn" @click="changeExpression" title="切换表情">
-          <span>😊</span>
-        </button>
-        <button class="control-btn" @click="toggleWidget" title="显示/隐藏">
-          <span>{{ isWidgetVisible ? '👁️' : '👁️‍🗨️' }}</span>
-        </button>
-      </div>
-    </div>
 
     <!-- 用户信息显示 -->
     <div class="user-info-panel" v-if="isLoggedIn && currentUser">
@@ -131,11 +115,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import type { CSSProperties } from 'vue'
 import Live2DModel from './components/Live2DModel.vue'
 import ChatWindow from './components/ChatWindow.vue'
 import VoiceCall from './components/VoiceCall.vue'
-import QRCodeLogin from './components/QRCodeLogin.vue'
 import UserAuthModal from './components/UserAuthModal.vue'
 import { autoModelConfig, getAutoModelIds } from './config/auto-models'
 import { getChatConfig, generateSessionId } from './config'
@@ -181,6 +165,42 @@ const widgetHeight = ref(400)
 
 // 小窗口显示状态
 const isWidgetVisible = ref(true)
+const widgetPosX = ref<number>(0)
+const widgetPosY = ref<number>(0)
+const widgetDragging = ref(false)
+let widgetDragOffsetX = 0
+let widgetDragOffsetY = 0
+
+const widgetStyle = computed<CSSProperties>(() => ({
+  position: 'fixed',
+  left: `${widgetPosX.value}px`,
+  top: `${widgetPosY.value}px`,
+  width: '320px'
+}))
+
+const startWidgetDrag = (e: MouseEvent) => {
+  widgetDragging.value = true
+  widgetDragOffsetX = e.clientX - widgetPosX.value
+  widgetDragOffsetY = e.clientY - widgetPosY.value
+  window.addEventListener('mousemove', onWidgetDrag)
+  window.addEventListener('mouseup', endWidgetDrag)
+}
+
+const onWidgetDrag = (e: MouseEvent) => {
+  if (!widgetDragging.value) return
+  const w = window.innerWidth
+  const h = window.innerHeight
+  const width = 320
+  const height = 400 + 56 + 56
+  widgetPosX.value = Math.min(Math.max(0, e.clientX - widgetDragOffsetX), w - width)
+  widgetPosY.value = Math.min(Math.max(0, e.clientY - widgetDragOffsetY), h - Math.min(h - 20, height))
+}
+
+const endWidgetDrag = () => {
+  widgetDragging.value = false
+  window.removeEventListener('mousemove', onWidgetDrag)
+  window.removeEventListener('mouseup', endWidgetDrag)
+}
 
 // 聊天窗口状态
 const showChat = ref(false)
@@ -188,8 +208,6 @@ const showChat = ref(false)
 // 语音通话窗口状态
 const showVoiceCall = ref(false)
 
-// 扫码登录窗口状态
-const showQRCodeLogin = ref(false)
 
 // 用户名密码登录窗口状态
 const showUserAuthModal = ref(false)
@@ -206,7 +224,6 @@ const wsConfig = ref(getChatConfig({
 
 // 获取其他WebSocket服务的URL
 const voiceWsUrl = getWebSocketUrl('voice')
-const qrcodeLoginWsUrl = getWebSocketUrl('qrcodeLogin')
 
 // 监听模型变化并输出日志
 watch(currentModel, (newModel, oldModel) => {
@@ -246,11 +263,6 @@ const toggleVoiceCall = () => {
   console.log(`语音通话窗口: ${showVoiceCall.value ? '打开' : '关闭'}`)
 }
 
-// 切换扫码登录窗口
-const toggleQRCodeLogin = () => {
-  showQRCodeLogin.value = !showQRCodeLogin.value
-  console.log(`扫码登录窗口: ${showQRCodeLogin.value ? '打开' : '关闭'}`)
-}
 
 // 切换用户名密码登录窗口
 const toggleUserAuthModal = () => {
@@ -258,28 +270,7 @@ const toggleUserAuthModal = () => {
   console.log(`用户名密码登录窗口: ${showUserAuthModal.value ? '打开' : '关闭'}`)
 }
 
-// 处理登录成功（扫码登录）
-const handleLoginSuccess = (userInfo: UserLoginInfo) => {
-  console.log('扫码登录成功:', userInfo)
-  isLoggedIn.value = true
-  currentUser.value = userInfo
-  
-  // 更新WebSocket配置
-  wsConfig.value.openid = userInfo.openid
-  wsConfig.value.aiSessionId = userInfo.sessionId // 传递正确的sessionId
-  
-  // 保存登录信息到本地存储
-  localStorage.setItem('userInfo', JSON.stringify(userInfo))
-  localStorage.setItem('isLoggedIn', 'true')
-  
-  console.log('扫码登录状态已更新 - openid:', userInfo.openid, 'sessionId:', userInfo.sessionId)
-}
 
-// 处理登录失败
-const handleLoginFailed = (error: string) => {
-  console.error('登录失败:', error)
-  alert(`登录失败: ${error}`)
-}
 
 // 处理用户名密码登录成功
 const handleUserAuthLoginSuccess = (userInfo: UserInfo) => {
@@ -362,6 +353,15 @@ if (modelIds.length > 0) {
 
 // 输出环境配置信息（开发时便于调试）
 logEnvConfig()
+
+onMounted(() => {
+  const w = window.innerWidth
+  const h = window.innerHeight
+  const width = 320
+  const height = 400 + 56 + 56
+  widgetPosX.value = Math.max(0, w - width - 20)
+  widgetPosY.value = Math.max(0, h - Math.min(h - 20, height) - 20)
+})
 </script>
 
 <style scoped>
@@ -419,8 +419,7 @@ logEnvConfig()
 /* Live2D 固定小窗口 */
 .live2d-widget {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
+  /* 通过 :style 控制 left/top */
   width: 320px;
   background: rgba(255, 255, 255, 0.98);
   border-radius: 16px;
@@ -472,6 +471,18 @@ logEnvConfig()
 .close-btn:hover {
   background: rgba(255, 255, 255, 0.3);
   transform: scale(1.1);
+}
+
+.widget-toolbar {
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.98);
+  border-top: 1px solid #e9ecef;
+}
+
+.toolbar-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .widget-body {
