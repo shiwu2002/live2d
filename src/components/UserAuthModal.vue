@@ -364,8 +364,8 @@ const clearMessages = () => {
   successMessage.value = ''
 }
 
-// 验证用户名
-const validateUsername = async () => {
+// 验证用户名（仅前端基本格式校验，后端会统一验证）
+const validateUsername = () => {
   const username = registerForm.value.username.trim()
 
   if (!username) {
@@ -383,13 +383,7 @@ const validateUsername = async () => {
     return
   }
 
-  // 检查用户名是否可用
-  const available = await authService.checkUsername(username)
-  if (!available) {
-    usernameError.value = '用户名已被使用'
-  } else {
-    usernameError.value = ''
-  }
+  usernameError.value = ''
 }
 
 // 验证密码（注册）
@@ -424,8 +418,8 @@ const validateConfirmPassword = () => {
   confirmPasswordError.value = ''
 }
 
-// 验证邮箱（注册）
-const validateEmail = async () => {
+// 验证邮箱（注册，仅前端基本格式校验）
+const validateEmail = () => {
   const email = registerForm.value.email?.trim()
 
   if (!email) {
@@ -438,17 +432,11 @@ const validateEmail = async () => {
     return
   }
 
-  // 检查邮箱是否可用（注册场景）
-  const available = await authService.checkEmail(email)
-  if (!available) {
-    emailError.value = '邮箱已被注册'
-  } else {
-    emailError.value = ''
-  }
+  emailError.value = ''
 }
 
-// 验证手机号（注册）
-const validatePhone = async () => {
+// 验证手机号（注册，仅前端基本格式校验）
+const validatePhone = () => {
   const phone = registerForm.value.phone?.trim()
 
   if (!phone) {
@@ -461,13 +449,7 @@ const validatePhone = async () => {
     return
   }
 
-  // 检查手机号是否可用
-  const available = await authService.checkPhone(phone)
-  if (!available) {
-    phoneError.value = '手机号已被注册'
-  } else {
-    phoneError.value = ''
-  }
+  phoneError.value = ''
 }
 
 // 验证邮箱（找回）
@@ -516,7 +498,7 @@ const sendRegisterEmailCode = async () => {
   errorMessage.value = ''
   successMessage.value = ''
 
-  await validateEmail()
+  validateEmail()
   if (emailError.value) {
     errorMessage.value = emailError.value
     return
@@ -633,11 +615,11 @@ const handleLogin = async () => {
 // 处理注册
 const handleRegister = async () => {
   // 先执行所有验证
-  await validateUsername()
+  validateUsername()
   validatePassword()
   validateConfirmPassword()
-  await validateEmail()
-  if (registerForm.value.phone) await validatePhone()
+  validateEmail()
+  if (registerForm.value.phone) validatePhone()
 
   // 检查是否有错误
   if (!isRegisterFormValid.value) {

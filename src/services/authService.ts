@@ -165,54 +165,6 @@ export class AuthService {
   }
 
   /**
-   * 检查用户名是否可用
-   */
-  async checkUsername(username: string): Promise<boolean> {
-    try {
-      const response = await fetch(
-        `${this.baseUrl}/auth/checkUsername?username=${encodeURIComponent(username)}`
-      )
-      const result: ApiResponse<AvailabilityResponse> = await response.json()
-      return result.code === 200 && result.data?.available === true
-    } catch (error) {
-      console.error('[AuthService] 检查用户名失败:', error)
-      return false
-    }
-  }
-
-  /**
-   * 检查邮箱是否可用
-   */
-  async checkEmail(email: string): Promise<boolean> {
-    try {
-      const response = await fetch(
-        `${this.baseUrl}/auth/checkEmail?email=${encodeURIComponent(email)}`
-      )
-      const result: ApiResponse<AvailabilityResponse> = await response.json()
-      return result.code === 200 && result.data?.available === true
-    } catch (error) {
-      console.error('[AuthService] 检查邮箱失败:', error)
-      return false
-    }
-  }
-
-  /**
-   * 检查手机号是否可用
-   */
-  async checkPhone(phone: string): Promise<boolean> {
-    try {
-      const response = await fetch(
-        `${this.baseUrl}/auth/checkPhone?phone=${encodeURIComponent(phone)}`
-      )
-      const result: ApiResponse<AvailabilityResponse> = await response.json()
-      return result.code === 200 && result.data?.available === true
-    } catch (error) {
-      console.error('[AuthService] 检查手机号失败:', error)
-      return false
-    }
-  }
-
-  /**
    * 保存认证数据到localStorage
    */
   private saveAuthData(userInfo: UserInfo): void {

@@ -1,7 +1,7 @@
 <template>
-  <div class="chat-window" :class="{ 'minimized': isMinimized }">
+  <div class="chat-window" :class="{ 'minimized': isMinimized }" :style="chatWindowStyle">
     <!-- 聊天窗口头部 -->
-    <div class="chat-header">
+    <div class="chat-header" @mousedown="startDrag">
       <div class="header-left">
         <span class="status-dot" :class="{ 'connected': isConnected }"></span>
         <span class="header-title">{{ modeText }}</span>
@@ -222,6 +222,48 @@ const displayMessages = computed<ExtendedChatMessage[]>(() => {
 
 // 引用
 const chatBody = ref<HTMLElement | null>(null)
+
+// 可拖拽位置状态（聊天框改为浮动小弹窗）
+const posX = ref<number>(0)
+const posY = ref<number>(0)
+const dragging = ref(false)
+let dragOffsetX = 0
+let dragOffsetY = 0
+const chatWindowStyle = computed(() => {
+  const maxW = Math.max(320, Math.min(380, window.innerWidth - 20))
+  const maxH = Math.max(360, Math.min(520, window.innerHeight - 100))
+  return {
+    position: 'fixed',
+    left: `${posX.value}px`,
+    top: `${posY.value}px`,
+    width: `${maxW}px`,
+    height: isMinimized.value ? '60px' : `${maxH}px`,
+  } as Record<string, string>
+})
+
+const startDrag = (e: MouseEvent) => {
+  dragging.value = true
+  dragOffsetX = e.clientX - posX.value
+  dragOffsetY = e.clientY - posY.value
+  window.addEventListener('mousemove', onDrag)
+  window.addEventListener('mouseup', endDrag)
+}
+
+const onDrag = (e: MouseEvent) => {
+  if (!dragging.value) return
+  const w = window.innerWidth
+  const h = window.innerHeight
+  const width = Math.max(320, Math.min(380, w - 20))
+  const height = isMinimized.value ? 60 : Math.max(360, Math.min(520, h - 100))
+  posX.value = Math.min(Math.max(0, e.clientX - dragOffsetX), w - width)
+  posY.value = Math.min(Math.max(0, e.clientY - dragOffsetY), h - height)
+}
+
+const endDrag = () => {
+  dragging.value = false
+  window.removeEventListener('mousemove', onDrag)
+  window.removeEventListener('mouseup', endDrag)
+}
 
 // 计时器
 let recordingTimer: number | null = null
@@ -663,6 +705,14 @@ watch(() => props.visible, (newVal) => {
 
 // 生命周期
 onMounted(() => {
+  // 设定初始位置为右下角的紧凑弹窗
+  const w = window.innerWidth
+  const h = window.innerHeight
+  const initW = Math.max(320, Math.min(380, w - 20))
+  const initH = Math.max(360, Math.min(520, h - 100))
+  posX.value = Math.max(0, w - initW - 20)
+  posY.value = Math.max(0, h - initH - 20)
+
   if (props.visible !== false) {
     initializeServices()
   }
@@ -677,22 +727,24 @@ onBeforeUnmount(() => {
 <style scoped>
 .chat-window {
   position: fixed;
-  bottom: 20px;
-  left: 20px;
   width: 380px;
-  max-height: 600px;
+  height: 520px;
   background: white;
   border-radius: 16px;
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  z-index: 1000;
-  transition: all 0.3s ease;
+  z-index: 1001;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .chat-window.minimized {
-  max-height: 60px;
+  height: 60px;
+}
+
+.chat-window.minimized {
+  transform: translateY(calc(100% - 60px));
 }
 
 .chat-header {
@@ -1144,8 +1196,145 @@ onBeforeUnmount(() => {
   .chat-window {
     left: 10px;
     right: 10px;
+    bottom: 10px;
     width: auto;
-    max-width: 400px;
+    max-width: none; /* 允许全宽 */
+    max-height: 70vh; /* 限制最大高度为视口的70% */
+  }
+  
+  .chat-window.minimized {
+    max-height: 50px;
+  }
+  
+  .chat-header {
+    padding: 12px 14px;
+  }
+  
+  .header-title {
+    font-size: 14px;
+  }
+  
+  .connection-status {
+    font-size: 11px;
+  }
+  
+  .header-btn {
+    width: 26px;
+    height: 26px;
+    font-size: 14px;
+  }
+  
+  .chat-body {
+    min-height: 200px;
+    max-height: calc(70vh - 200px); /* 减去头部和输入区域的高度 */
+    padding: 12px;
+  }
+  
+  .message-bubble {
+    max-width: 80%;
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+  
+  .message-time {
+    font-size: 10px;
+  }
+  
+  .voice-message {
+    min-width: 120px;
+  }
+  
+  .voice-play-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
+  }
+  
+  .voice-duration {
+    font-size: 13px;
+  }
+  
+  .image-message {
+    max-width: 85%;
+  }
+  
+  .image-grid {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 6px;
+  }
+  
+  .chat-footer {
+    padding: 12px;
+  }
+  
+  .text-input {
+    padding: 8px 10px;
+    font-size: 14px;
+    max-height: 80px;
+  }
+  
+  .action-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+  }
+  
+  .voice-call-btn {
+    padding: 10px;
+    font-size: 14px;
+  }
+  
+  .call-icon {
+    font-size: 18px;
+  }
+  
+  .call-time {
+    font-size: 14px;
+  }
+  
+  .recording-indicator {
+    margin-top: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  
+  .empty-state {
+    padding: 40px 20px;
+  }
+  
+  .empty-icon {
+    font-size: 36px;
+  }
+  
+  .empty-text {
+    font-size: 13px;
+  }
+}
+
+/* 极小屏幕（小于375px）额外优化 */
+@media (max-width: 375px) {
+  .chat-window {
+    max-height: 65vh;
+  }
+  
+  .chat-body {
+    max-height: calc(65vh - 180px);
+  }
+  
+  .message-bubble {
+    max-width: 85%;
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+  
+  .action-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+  
+  .input-actions {
+    gap: 6px;
   }
 }
 </style>

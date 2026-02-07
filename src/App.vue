@@ -22,14 +22,6 @@
       @close="showVoiceCall = false"
     />
 
-    <!-- 扫码登录窗口 -->
-    <QRCodeLogin
-      :visible="showQRCodeLogin"
-      :ws-url="qrcodeLoginWsUrl"
-      @close="showQRCodeLogin = false"
-      @login-success="handleLoginSuccess"
-      @login-failed="handleLoginFailed"
-    />
 
     <!-- 用户名密码登录注册窗口 -->
     <UserAuthModal
@@ -40,12 +32,47 @@
     />
 
     <!-- 固定的 Live2D 小窗口 -->
-    <div class="live2d-widget" v-if="discoveredModels.length > 0">
-      <div class="widget-header">
+    <div class="live2d-widget" v-if="discoveredModels.length > 0" :style="widgetStyle">
+      <div class="widget-header" @mousedown="startWidgetDrag">
         <span class="widget-title">{{ currentModelName }}</span>
         <button class="close-btn" @click="toggleWidget" :title="isWidgetVisible ? '隐藏' : '显示'">
           {{ isWidgetVisible ? '−' : '+' }}
         </button>
+      </div>
+      
+      <div class="widget-toolbar" v-show="isWidgetVisible">
+        <div class="toolbar-buttons">
+          <button 
+            v-if="!isLoggedIn" 
+            class="control-btn login-btn" 
+            @click="toggleUserAuthModal" 
+            title="账号密码登录"
+          >
+            <span>🔐</span>
+          </button>
+          <button 
+            v-else 
+            class="control-btn logout-btn" 
+            @click="handleLogout" 
+            :title="`${currentUser?.nickname || '用户'} - 退出登录`"
+          >
+            <span>👤</span>
+          </button>
+          <button class="control-btn" @click="toggleChat" title="聊天窗口">
+            <span>💬</span>
+          </button>
+          <button class="control-btn" @click="toggleVoiceCall" title="语音通话">
+            <span>🎤</span>
+          </button>
+          <select class="control-select" @change="handleActionSelect" v-model="selectedAction" title="动作/表情">
+            <option value="">🎭</option>
+            <option value="motion">🎭 随机动作</option>
+            <option value="expression">😊 随机表情</option>
+          </select>
+          <button class="control-btn" @click="toggleWidget" title="显示/隐藏">
+            <span>{{ isWidgetVisible ? '👁️' : '👁️‍🗨️' }}</span>
+          </button>
+        </div>
       </div>
       
       <div class="widget-body" v-show="isWidgetVisible">
@@ -67,50 +94,6 @@
       </div>
     </div>
     
-    <!-- 控制台按钮面板 -->
-    <div class="control-panel" v-if="discoveredModels.length > 0">
-      <div class="control-buttons">
-        <button 
-          v-if="!isLoggedIn" 
-          class="control-btn login-btn" 
-          @click="toggleUserAuthModal" 
-          title="账号密码登录"
-        >
-          <span>🔐</span>
-        </button>
-        <button 
-          v-if="!isLoggedIn" 
-          class="control-btn qrcode-btn" 
-          @click="toggleQRCodeLogin" 
-          title="扫码登录"
-        >
-          <span>📱</span>
-        </button>
-        <button 
-          v-else 
-          class="control-btn logout-btn" 
-          @click="handleLogout" 
-          :title="`${currentUser?.nickname || '用户'} - 退出登录`"
-        >
-          <span>👤</span>
-        </button>
-        <button class="control-btn" @click="toggleChat" title="聊天窗口">
-          <span>💬</span>
-        </button>
-        <button class="control-btn" @click="toggleVoiceCall" title="语音通话">
-          <span>🎤</span>
-        </button>
-        <button class="control-btn" @click="playRandomMotion" title="随机动作">
-          <span>🎭</span>
-        </button>
-        <button class="control-btn" @click="changeExpression" title="切换表情">
-          <span>😊</span>
-        </button>
-        <button class="control-btn" @click="toggleWidget" title="显示/隐藏">
-          <span>{{ isWidgetVisible ? '👁️' : '👁️‍🗨️' }}</span>
-        </button>
-      </div>
-    </div>
 
     <!-- 用户信息显示 -->
     <div class="user-info-panel" v-if="isLoggedIn && currentUser">
@@ -131,11 +114,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import type { CSSProperties } from 'vue'
 import Live2DModel from './components/Live2DModel.vue'
 import ChatWindow from './components/ChatWindow.vue'
 import VoiceCall from './components/VoiceCall.vue'
-import QRCodeLogin from './components/QRCodeLogin.vue'
 import UserAuthModal from './components/UserAuthModal.vue'
 import { autoModelConfig, getAutoModelIds } from './config/auto-models'
 import { getChatConfig, generateSessionId } from './config'
@@ -181,6 +164,42 @@ const widgetHeight = ref(400)
 
 // 小窗口显示状态
 const isWidgetVisible = ref(true)
+const widgetPosX = ref<number>(0)
+const widgetPosY = ref<number>(0)
+const widgetDragging = ref(false)
+let widgetDragOffsetX = 0
+let widgetDragOffsetY = 0
+
+const widgetStyle = computed<CSSProperties>(() => ({
+  position: 'fixed',
+  left: `${widgetPosX.value}px`,
+  top: `${widgetPosY.value}px`,
+  width: '320px'
+}))
+
+const startWidgetDrag = (e: MouseEvent) => {
+  widgetDragging.value = true
+  widgetDragOffsetX = e.clientX - widgetPosX.value
+  widgetDragOffsetY = e.clientY - widgetPosY.value
+  window.addEventListener('mousemove', onWidgetDrag)
+  window.addEventListener('mouseup', endWidgetDrag)
+}
+
+const onWidgetDrag = (e: MouseEvent) => {
+  if (!widgetDragging.value) return
+  const w = window.innerWidth
+  const h = window.innerHeight
+  const width = 320
+  const height = 400 + 56 + 56
+  widgetPosX.value = Math.min(Math.max(0, e.clientX - widgetDragOffsetX), w - width)
+  widgetPosY.value = Math.min(Math.max(0, e.clientY - widgetDragOffsetY), h - Math.min(h - 20, height))
+}
+
+const endWidgetDrag = () => {
+  widgetDragging.value = false
+  window.removeEventListener('mousemove', onWidgetDrag)
+  window.removeEventListener('mouseup', endWidgetDrag)
+}
 
 // 聊天窗口状态
 const showChat = ref(false)
@@ -188,8 +207,6 @@ const showChat = ref(false)
 // 语音通话窗口状态
 const showVoiceCall = ref(false)
 
-// 扫码登录窗口状态
-const showQRCodeLogin = ref(false)
 
 // 用户名密码登录窗口状态
 const showUserAuthModal = ref(false)
@@ -206,7 +223,6 @@ const wsConfig = ref(getChatConfig({
 
 // 获取其他WebSocket服务的URL
 const voiceWsUrl = getWebSocketUrl('voice')
-const qrcodeLoginWsUrl = getWebSocketUrl('qrcodeLogin')
 
 // 监听模型变化并输出日志
 watch(currentModel, (newModel, oldModel) => {
@@ -234,6 +250,20 @@ const changeExpression = () => {
   // 这里可以添加切换Live2D模型表情的逻辑
 }
 
+// 动作/表情下拉框选中的值
+const selectedAction = ref('')
+
+// 处理动作/表情选择
+const handleActionSelect = () => {
+  if (selectedAction.value === 'motion') {
+    playRandomMotion()
+  } else if (selectedAction.value === 'expression') {
+    changeExpression()
+  }
+  // 执行后重置为默认选项
+  selectedAction.value = ''
+}
+
 // 切换聊天窗口
 const toggleChat = () => {
   showChat.value = !showChat.value
@@ -246,11 +276,6 @@ const toggleVoiceCall = () => {
   console.log(`语音通话窗口: ${showVoiceCall.value ? '打开' : '关闭'}`)
 }
 
-// 切换扫码登录窗口
-const toggleQRCodeLogin = () => {
-  showQRCodeLogin.value = !showQRCodeLogin.value
-  console.log(`扫码登录窗口: ${showQRCodeLogin.value ? '打开' : '关闭'}`)
-}
 
 // 切换用户名密码登录窗口
 const toggleUserAuthModal = () => {
@@ -258,28 +283,7 @@ const toggleUserAuthModal = () => {
   console.log(`用户名密码登录窗口: ${showUserAuthModal.value ? '打开' : '关闭'}`)
 }
 
-// 处理登录成功（扫码登录）
-const handleLoginSuccess = (userInfo: UserLoginInfo) => {
-  console.log('扫码登录成功:', userInfo)
-  isLoggedIn.value = true
-  currentUser.value = userInfo
-  
-  // 更新WebSocket配置
-  wsConfig.value.openid = userInfo.openid
-  wsConfig.value.aiSessionId = userInfo.sessionId // 传递正确的sessionId
-  
-  // 保存登录信息到本地存储
-  localStorage.setItem('userInfo', JSON.stringify(userInfo))
-  localStorage.setItem('isLoggedIn', 'true')
-  
-  console.log('扫码登录状态已更新 - openid:', userInfo.openid, 'sessionId:', userInfo.sessionId)
-}
 
-// 处理登录失败
-const handleLoginFailed = (error: string) => {
-  console.error('登录失败:', error)
-  alert(`登录失败: ${error}`)
-}
 
 // 处理用户名密码登录成功
 const handleUserAuthLoginSuccess = (userInfo: UserInfo) => {
@@ -362,6 +366,15 @@ if (modelIds.length > 0) {
 
 // 输出环境配置信息（开发时便于调试）
 logEnvConfig()
+
+onMounted(() => {
+  const w = window.innerWidth
+  const h = window.innerHeight
+  const width = 320
+  const height = 400 + 56 + 56
+  widgetPosX.value = Math.max(0, w - width - 20)
+  widgetPosY.value = Math.max(0, h - Math.min(h - 20, height) - 20)
+})
 </script>
 
 <style scoped>
@@ -419,9 +432,8 @@ logEnvConfig()
 /* Live2D 固定小窗口 */
 .live2d-widget {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
-  width: 300px;
+  /* 通过 :style 控制 left/top */
+  width: 320px;
   background: rgba(255, 255, 255, 0.98);
   border-radius: 16px;
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25);
@@ -474,6 +486,18 @@ logEnvConfig()
   transform: scale(1.1);
 }
 
+.widget-toolbar {
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.98);
+  border-top: 1px solid #e9ecef;
+}
+
+.toolbar-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .widget-body {
   width: 100%;
   height: 400px;
@@ -515,12 +539,12 @@ logEnvConfig()
 .control-panel {
   position: fixed;
   bottom: 20px;
-  right: 340px; /* 小窗口宽度300px + 间距20px + 边距20px */
+  right: 360px; /* 小窗口宽度320px + 间距20px + 边距20px */
   background: rgba(255, 255, 255, 0.98);
   border-radius: 16px;
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25);
   backdrop-filter: blur(10px);
-  padding: 16px;
+  padding: 12px;
   z-index: 999;
   transition: all 0.3s ease;
   border: 2px solid rgba(102, 126, 234, 0.2);
@@ -533,19 +557,21 @@ logEnvConfig()
 
 .control-buttons {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 280px;
 }
 
 .control-btn {
-  width: 56px;
-  height: 56px;
+  width: 48px;
+  height: 48px;
   border: none;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  border-radius: 12px;
+  border-radius: 10px;
   cursor: pointer;
-  font-size: 24px;
+  font-size: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -589,6 +615,45 @@ logEnvConfig()
 
 .logout-btn:hover {
   box-shadow: 0 6px 20px rgba(255, 152, 0, 0.4);
+}
+
+/* 动作/表情下拉框样式 */
+.control-select {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  font-size: 20px;
+  color: white;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  outline: none;
+  text-align: center;
+  text-align-last: center;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.control-select:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.control-select:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.control-select option {
+  background: white;
+  color: #333;
+  padding: 8px;
+  font-size: 14px;
+  text-align: left;
 }
 
 /* 用户信息面板 */
@@ -654,44 +719,120 @@ logEnvConfig()
 
 /* 响应式设计 */
 @media (max-width: 768px) {
+  /* Live2D小窗口 - 全屏布局 */
   .live2d-widget {
-    width: 280px;
-    bottom: 10px;
-    right: 10px;
+    width: 100vw;
+    height: 100vh;
+    bottom: 0;
+    right: 0;
+    top: 0;
+    left: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
   
-  .widget-body {
-    height: 360px;
-  }
-  
-  .control-panel {
-    right: 300px;
-    padding: 12px;
-  }
-  
-  .control-btn {
-    width: 48px;
-    height: 48px;
-    font-size: 20px;
-  }
-  
-  .user-info-panel {
+  .widget-header {
+    position: fixed;
     top: 10px;
+    left: 10px;
     right: 10px;
-    padding: 12px 16px;
+    z-index: 10;
+    padding: 8px 12px;
+    border-radius: 12px;
+    background: rgba(102, 126, 234, 0.95);
+    backdrop-filter: blur(10px);
   }
   
-  .user-avatar {
-    width: 40px;
-    height: 40px;
-  }
-  
-  .user-nickname {
+  .widget-title {
     font-size: 14px;
   }
   
+  .close-btn {
+    width: 24px;
+    height: 24px;
+    font-size: 16px;
+  }
+  
+  .widget-body {
+    width: 100vw;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+  }
+  
+  .widget-controls {
+    position: fixed;
+    top: 60px;
+    left: 10px;
+    right: 10px;
+    z-index: 10;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    border: none;
+  }
+  
+  .model-selector {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  
+  /* 控制面板 - 放在模型选择器下方 */
+  .control-panel {
+    position: fixed;
+    top: 118px;
+    left: 10px;
+    right: 10px;
+    bottom: auto;
+    z-index: 10;
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+  }
+  
+  .control-buttons {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    max-width: 100%;
+  }
+  
+  .control-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+    border-radius: 10px;
+  }
+  
+  /* 用户信息面板 - 放在控制面板下方 */
+  .user-info-panel {
+    position: fixed;
+    top: 200px;
+    left: 10px;
+    right: 10px;
+    bottom: auto;
+    z-index: 10;
+    padding: 8px 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+  }
+  
+  .user-avatar {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .user-nickname {
+    font-size: 13px;
+  }
+  
   .user-id {
-    font-size: 11px;
+    font-size: 10px;
   }
   
   .main-content h1 {
