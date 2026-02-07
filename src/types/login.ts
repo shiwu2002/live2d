@@ -67,8 +67,9 @@ export interface WSMessage {
 export interface RegisterRequest {
   username: string           // 用户名
   password: string           // 密码
-  email?: string            // 邮箱（可选）
-  phone?: string            // 手机号（可选）
+  email: string              // 邮箱（必填）
+  phone?: string             // 手机号（可选）
+  code: string               // 邮箱验证码（必填）
 }
 
 // 用户登录请求
@@ -80,6 +81,13 @@ export interface LoginRequest {
 // 修改密码请求
 export interface ChangePasswordRequest {
   oldPassword: string        // 旧密码
+  newPassword: string        // 新密码
+}
+
+// 通过邮箱验证码重置密码请求
+export interface ResetPasswordByEmailRequest {
+  email: string              // 邮箱
+  code: string               // 邮箱验证码
   newPassword: string        // 新密码
 }
 

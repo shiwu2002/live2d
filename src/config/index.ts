@@ -64,8 +64,8 @@ export interface AudioConfig {
 // 开发环境配置
 const developmentConfig: EnvConfig = {
   env: 'development',
-  apiBaseUrl: 'http://localhost:8088',
-  wsBaseUrl: 'ws://localhost:8088',
+  apiBaseUrl: 'http://localhost:8080',
+  wsBaseUrl: 'ws://localhost:8080',
   wsEndpoints: {
     chat: '/ws/chat',
     voice: '/ws/voice',

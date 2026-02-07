@@ -7,6 +7,7 @@ import type {
   RegisterRequest,
   LoginRequest,
   ChangePasswordRequest,
+  ResetPasswordByEmailRequest,
   UserInfo,
   ApiResponse,
   AvailabilityResponse
@@ -26,13 +27,17 @@ export class AuthService {
    */
   async register(data: RegisterRequest): Promise<ApiResponse<UserInfo>> {
     try {
-      // 验证参数
+      // 验证参数（后端要求：邮箱必填，验证码必填）
       if (!data.username || !data.password) {
         throw new Error('用户名和密码不能为空')
       }
 
-      if (!data.email && !data.phone) {
-        throw new Error('邮箱和手机号至少需要提供一个')
+      if (!data.email) {
+        throw new Error('邮箱为必填项')
+      }
+
+      if (!data.code) {
+        throw new Error('邮箱验证码不能为空')
       }
 
       if (data.password.length < 6) {
@@ -43,7 +48,8 @@ export class AuthService {
       const formData = new URLSearchParams()
       formData.append('username', data.username)
       formData.append('password', data.password)
-      if (data.email) formData.append('email', data.email)
+      formData.append('email', data.email)
+      formData.append('code', data.code)
       if (data.phone) formData.append('phone', data.phone)
 
       const response = await fetch(`${this.baseUrl}/auth/register`, {
@@ -253,6 +259,109 @@ export class AuthService {
     const token = this.getToken()
     const userInfo = this.getUserInfo()
     return !!token && !!userInfo
+  }
+
+  /**
+   * 发送注册邮箱验证码
+   */
+  async sendEmailCode(email: string): Promise<ApiResponse<{ message: string }>> {
+    try {
+      if (!email) {
+        throw new Error('邮箱不能为空')
+      }
+      const formData = new URLSearchParams()
+      formData.append('email', email)
+
+      const response = await fetch(`${this.baseUrl}/auth/sendEmailCode`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: formData.toString()
+      })
+
+      const result: ApiResponse<{ message: string }> = await response.json()
+      return result
+    } catch (error) {
+      console.error('[AuthService] 发送注册邮箱验证码失败:', error)
+      return {
+        code: 500,
+        msg: error instanceof Error ? error.message : '发送验证码失败',
+        data: null
+      }
+    }
+  }
+
+  /**
+   * 发送找回密码邮箱验证码
+   */
+  async sendResetEmailCode(email: string): Promise<ApiResponse<{ message: string }>> {
+    try {
+      if (!email) {
+        throw new Error('邮箱不能为空')
+      }
+      const formData = new URLSearchParams()
+      formData.append('email', email)
+
+      const response = await fetch(`${this.baseUrl}/auth/sendResetEmailCode`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: formData.toString()
+      })
+
+      const result: ApiResponse<{ message: string }> = await response.json()
+      return result
+    } catch (error) {
+      console.error('[AuthService] 发送找回密码验证码失败:', error)
+      return {
+        code: 500,
+        msg: error instanceof Error ? error.message : '发送验证码失败',
+        data: null
+      }
+    }
+  }
+
+  /**
+   * 通过邮箱验证码重置密码
+   */
+  async resetPasswordByEmail(data: ResetPasswordByEmailRequest): Promise<ApiResponse<string>> {
+    try {
+      // 参数校验
+      if (!data.email) {
+        throw new Error('邮箱不能为空')
+      }
+      if (!data.code) {
+        throw new Error('邮箱验证码不能为空')
+      }
+      if (!data.newPassword || data.newPassword.length < 6) {
+        throw new Error('新密码长度至少为6位')
+      }
+
+      const formData = new URLSearchParams()
+      formData.append('email', data.email)
+      formData.append('code', data.code)
+      formData.append('newPassword', data.newPassword)
+
+      const response = await fetch(`${this.baseUrl}/auth/resetPasswordByEmail`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: formData.toString()
+      })
+
+      const result: ApiResponse<string> = await response.json()
+      return result
+    } catch (error) {
+      console.error('[AuthService] 通过邮箱验证码重置密码失败:', error)
+      return {
+        code: 500,
+        msg: error instanceof Error ? error.message : '重置密码失败',
+        data: null
+      }
+    }
   }
 
   /**

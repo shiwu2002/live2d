@@ -5,10 +5,18 @@
       <button class="close-btn" @click="handleClose">✕</button>
 
       <!-- 标题 -->
-      <h2 class="auth-title">{{ isLogin ? '用户登录' : '用户注册' }}</h2>
+      <h2 class="auth-title">
+        {{
+          isForgotPassword
+            ? '找回密码'
+            : isLogin
+              ? '用户登录'
+              : '用户注册'
+        }}
+      </h2>
 
       <!-- 登录表单 -->
-      <form v-if="isLogin" class="auth-form" @submit.prevent="handleLogin">
+      <form v-if="!isForgotPassword && isLogin" class="auth-form" @submit.prevent="handleLogin">
         <div class="form-group">
           <label>账号</label>
           <input
@@ -35,12 +43,14 @@
 
         <div class="form-footer">
           <span>还没有账号？</span>
-          <a href="#" @click.prevent="isLogin = false">立即注册</a>
+          <a href="#" @click.prevent="switchToRegister">立即注册</a>
+          <span style="margin-left: 10px">忘记密码？</span>
+          <a href="#" @click.prevent="switchToForgot">找回密码</a>
         </div>
       </form>
 
       <!-- 注册表单 -->
-      <form v-else class="auth-form" @submit.prevent="handleRegister">
+      <form v-else-if="!isForgotPassword && !isLogin" class="auth-form" @submit.prevent="handleRegister">
         <div class="form-group">
           <label>用户名 *</label>
           <input
@@ -78,14 +88,38 @@
         </div>
 
         <div class="form-group">
-          <label>邮箱</label>
-          <input
-            v-model="registerForm.email"
-            type="email"
-            placeholder="请输入邮箱（选填）"
-            @blur="validateEmail"
-          />
+          <label>邮箱 *</label>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input
+              v-model="registerForm.email"
+              type="email"
+              placeholder="请输入邮箱（必填）"
+              required
+              @blur="validateEmail"
+              style="flex: 1"
+            />
+            <button
+              type="button"
+              class="submit-btn"
+              style="padding: 10px 12px"
+              :disabled="isSubmitting || !canSendRegisterCode || regCodeCountdown > 0"
+              @click="sendRegisterEmailCode"
+            >
+              {{ regCodeCountdown > 0 ? `重新发送(${regCodeCountdown}s)` : '发送验证码' }}
+            </button>
+          </div>
           <span v-if="emailError" class="error-tip">{{ emailError }}</span>
+        </div>
+
+        <div class="form-group">
+          <label>邮箱验证码 *</label>
+          <input
+            v-model="registerForm.code"
+            type="text"
+            inputmode="numeric"
+            placeholder="请输入邮箱验证码"
+            required
+          />
         </div>
 
         <div class="form-group">
@@ -97,16 +131,86 @@
             @blur="validatePhone"
           />
           <span v-if="phoneError" class="error-tip">{{ phoneError }}</span>
-          <span class="info-tip">*邮箱和手机号至少填写一个</span>
         </div>
 
-        <button type="submit" class="submit-btn" :disabled="isSubmitting || !isFormValid">
+        <button type="submit" class="submit-btn" :disabled="isSubmitting || !isRegisterFormValid">
           {{ isSubmitting ? '注册中...' : '注册' }}
         </button>
 
         <div class="form-footer">
           <span>已有账号？</span>
-          <a href="#" @click.prevent="isLogin = true">立即登录</a>
+          <a href="#" @click.prevent="switchToLogin">立即登录</a>
+        </div>
+      </form>
+
+      <!-- 找回密码表单 -->
+      <form v-else class="auth-form" @submit.prevent="handleResetPasswordByEmail">
+        <div class="form-group">
+          <label>邮箱 *</label>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input
+              v-model="resetForm.email"
+              type="email"
+              placeholder="请输入注册邮箱"
+              required
+              @blur="validateResetEmail"
+              style="flex: 1"
+            />
+            <button
+              type="button"
+              class="submit-btn"
+              style="padding: 10px 12px"
+              :disabled="isSubmitting || !canSendResetCode || resetCodeCountdown > 0"
+              @click="sendResetEmailCode"
+            >
+              {{ resetCodeCountdown > 0 ? `重新发送(${resetCodeCountdown}s)` : '发送验证码' }}
+            </button>
+          </div>
+          <span v-if="resetEmailError" class="error-tip">{{ resetEmailError }}</span>
+        </div>
+
+        <div class="form-group">
+          <label>邮箱验证码 *</label>
+          <input
+            v-model="resetForm.code"
+            type="text"
+            inputmode="numeric"
+            placeholder="请输入邮箱验证码"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label>新密码 *</label>
+          <input
+            v-model="resetForm.newPassword"
+            type="password"
+            placeholder="至少6位密码"
+            required
+            @blur="validateResetNewPassword"
+          />
+          <span v-if="resetNewPasswordError" class="error-tip">{{ resetNewPasswordError }}</span>
+        </div>
+
+        <div class="form-group">
+          <label>确认新密码 *</label>
+          <input
+            v-model="resetConfirmPassword"
+            type="password"
+            placeholder="再次输入新密码"
+            required
+            @blur="validateResetConfirmPassword"
+          />
+          <span v-if="resetConfirmPasswordError" class="error-tip">{{ resetConfirmPasswordError }}</span>
+        </div>
+
+        <button type="submit" class="submit-btn" :disabled="isSubmitting || !isResetFormValid">
+          {{ isSubmitting ? '重置中...' : '重置密码' }}
+        </button>
+
+        <div class="form-footer">
+          <span>想起密码了？</span>
+          <a href="#" @click.prevent="switchToLogin">返回登录</a>
         </div>
       </form>
 
@@ -126,7 +230,12 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { authService } from '../services/authService'
-import type { LoginRequest, RegisterRequest, UserInfo } from '../types/login'
+import type {
+  LoginRequest,
+  RegisterRequest,
+  ResetPasswordByEmailRequest,
+  UserInfo
+} from '../types/login'
 import { getApiBaseUrl } from '../config'
 
 // Props
@@ -148,6 +257,7 @@ const emit = defineEmits<{
 
 // 状态
 const isLogin = ref(true)
+const isForgotPassword = ref(false)
 const isSubmitting = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
@@ -158,15 +268,32 @@ const loginForm = ref<LoginRequest>({
   password: ''
 })
 
-// 注册表单
+// 注册表单（邮箱与验证码为必填）
 const registerForm = ref<RegisterRequest>({
   username: '',
   password: '',
   email: '',
-  phone: ''
+  phone: '',
+  code: ''
 })
 
 const confirmPassword = ref('')
+
+// 找回密码表单
+const resetForm = ref<ResetPasswordByEmailRequest>({
+  email: '',
+  code: '',
+  newPassword: ''
+})
+const resetConfirmPassword = ref('')
+
+// 发送验证码控制
+const regCodeCountdown = ref(0)
+const resetCodeCountdown = ref(0)
+let regTimer: number | null = null
+let resetTimer: number | null = null
+const canSendRegisterCode = ref(true)
+const canSendResetCode = ref(true)
 
 // 验证错误
 const usernameError = ref('')
@@ -175,8 +302,12 @@ const confirmPasswordError = ref('')
 const emailError = ref('')
 const phoneError = ref('')
 
-// 表单验证状态
-const isFormValid = computed(() => {
+const resetEmailError = ref('')
+const resetNewPasswordError = ref('')
+const resetConfirmPasswordError = ref('')
+
+// 表单验证状态（注册）
+const isRegisterFormValid = computed(() => {
   return (
     !usernameError.value &&
     !passwordError.value &&
@@ -186,7 +317,22 @@ const isFormValid = computed(() => {
     registerForm.value.username &&
     registerForm.value.password &&
     confirmPassword.value &&
-    (registerForm.value.email || registerForm.value.phone)
+    registerForm.value.email &&
+    registerForm.value.code !== ''
+  )
+})
+
+// 表单验证状态（找回）
+const isResetFormValid = computed(() => {
+  return (
+    !resetEmailError.value &&
+    !resetNewPasswordError.value &&
+    !resetConfirmPasswordError.value &&
+    resetForm.value.email &&
+    resetForm.value.code &&
+    resetForm.value.newPassword &&
+    resetConfirmPassword.value &&
+    resetForm.value.newPassword === resetConfirmPassword.value
   )
 })
 
@@ -195,10 +341,33 @@ watch(() => props.apiBaseUrl, (newUrl) => {
   authService.setBaseUrl(newUrl)
 }, { immediate: true })
 
+// 视图切换
+const switchToRegister = () => {
+  isLogin.value = false
+  isForgotPassword.value = false
+  clearMessages()
+}
+const switchToLogin = () => {
+  isLogin.value = true
+  isForgotPassword.value = false
+  clearMessages()
+}
+const switchToForgot = () => {
+  isForgotPassword.value = true
+  isLogin.value = false
+  clearMessages()
+}
+
+// 清理提示
+const clearMessages = () => {
+  errorMessage.value = ''
+  successMessage.value = ''
+}
+
 // 验证用户名
 const validateUsername = async () => {
   const username = registerForm.value.username.trim()
-  
+
   if (!username) {
     usernameError.value = '用户名不能为空'
     return
@@ -223,7 +392,7 @@ const validateUsername = async () => {
   }
 }
 
-// 验证密码
+// 验证密码（注册）
 const validatePassword = () => {
   const password = registerForm.value.password
 
@@ -240,7 +409,7 @@ const validatePassword = () => {
   passwordError.value = ''
 }
 
-// 验证确认密码
+// 验证确认密码（注册）
 const validateConfirmPassword = () => {
   if (!confirmPassword.value) {
     confirmPasswordError.value = '请再次输入密码'
@@ -255,12 +424,12 @@ const validateConfirmPassword = () => {
   confirmPasswordError.value = ''
 }
 
-// 验证邮箱
+// 验证邮箱（注册）
 const validateEmail = async () => {
   const email = registerForm.value.email?.trim()
 
   if (!email) {
-    emailError.value = ''
+    emailError.value = '邮箱为必填项'
     return
   }
 
@@ -269,7 +438,7 @@ const validateEmail = async () => {
     return
   }
 
-  // 检查邮箱是否可用
+  // 检查邮箱是否可用（注册场景）
   const available = await authService.checkEmail(email)
   if (!available) {
     emailError.value = '邮箱已被注册'
@@ -278,7 +447,7 @@ const validateEmail = async () => {
   }
 }
 
-// 验证手机号
+// 验证手机号（注册）
 const validatePhone = async () => {
   const phone = registerForm.value.phone?.trim()
 
@@ -299,6 +468,140 @@ const validatePhone = async () => {
   } else {
     phoneError.value = ''
   }
+}
+
+// 验证邮箱（找回）
+const validateResetEmail = () => {
+  const email = resetForm.value.email?.trim()
+  if (!email) {
+    resetEmailError.value = '邮箱为必填项'
+    return
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    resetEmailError.value = '邮箱格式不正确'
+    return
+  }
+  resetEmailError.value = ''
+}
+
+// 验证新密码（找回）
+const validateResetNewPassword = () => {
+  const pwd = resetForm.value.newPassword
+  if (!pwd) {
+    resetNewPasswordError.value = '新密码不能为空'
+    return
+  }
+  if (pwd.length < 6) {
+    resetNewPasswordError.value = '新密码至少6位'
+    return
+  }
+  resetNewPasswordError.value = ''
+}
+
+// 验证确认新密码（找回）
+const validateResetConfirmPassword = () => {
+  if (!resetConfirmPassword.value) {
+    resetConfirmPasswordError.value = '请再次输入新密码'
+    return
+  }
+  if (resetConfirmPassword.value !== resetForm.value.newPassword) {
+    resetConfirmPasswordError.value = '两次密码不一致'
+    return
+  }
+  resetConfirmPasswordError.value = ''
+}
+
+// 发送注册邮箱验证码
+const sendRegisterEmailCode = async () => {
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  await validateEmail()
+  if (emailError.value) {
+    errorMessage.value = emailError.value
+    return
+  }
+
+  if (!registerForm.value.email) {
+    errorMessage.value = '请先填写邮箱'
+    return
+  }
+
+  try {
+    const resp = await authService.sendEmailCode(registerForm.value.email)
+    if (resp.code === 200) {
+      successMessage.value = '验证码已发送，请查收邮件'
+      startRegCountdown(60)
+    } else {
+      errorMessage.value = resp.msg || '验证码发送失败'
+    }
+  } catch (e) {
+    console.error('[UserAuthModal] 发送注册验证码失败:', e)
+    errorMessage.value = '验证码发送失败，请稍后重试'
+  }
+}
+
+// 发送找回密码邮箱验证码
+const sendResetEmailCode = async () => {
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  validateResetEmail()
+  if (resetEmailError.value) {
+    errorMessage.value = resetEmailError.value
+    return
+  }
+
+  if (!resetForm.value.email) {
+    errorMessage.value = '请先填写邮箱'
+    return
+  }
+
+  try {
+    const resp = await authService.sendResetEmailCode(resetForm.value.email)
+    if (resp.code === 200) {
+      successMessage.value = '验证码已发送，请查收邮件'
+      startResetCountdown(60)
+    } else {
+      errorMessage.value = resp.msg || '验证码发送失败'
+    }
+  } catch (e) {
+    console.error('[UserAuthModal] 发送找回验证码失败:', e)
+    errorMessage.value = '验证码发送失败，请稍后重试'
+  }
+}
+
+// 倒计时控制
+const startRegCountdown = (sec: number) => {
+  regCodeCountdown.value = sec
+  canSendRegisterCode.value = true
+  if (regTimer) {
+    window.clearInterval(regTimer)
+    regTimer = null
+  }
+  regTimer = window.setInterval(() => {
+    regCodeCountdown.value -= 1
+    if (regCodeCountdown.value <= 0 && regTimer) {
+      window.clearInterval(regTimer)
+      regTimer = null
+    }
+  }, 1000)
+}
+
+const startResetCountdown = (sec: number) => {
+  resetCodeCountdown.value = sec
+  canSendResetCode.value = true
+  if (resetTimer) {
+    window.clearInterval(resetTimer)
+    resetTimer = null
+  }
+  resetTimer = window.setInterval(() => {
+    resetCodeCountdown.value -= 1
+    if (resetCodeCountdown.value <= 0 && resetTimer) {
+      window.clearInterval(resetTimer)
+      resetTimer = null
+    }
+  }, 1000)
 }
 
 // 处理登录
@@ -333,11 +636,11 @@ const handleRegister = async () => {
   await validateUsername()
   validatePassword()
   validateConfirmPassword()
-  if (registerForm.value.email) await validateEmail()
+  await validateEmail()
   if (registerForm.value.phone) await validatePhone()
 
   // 检查是否有错误
-  if (!isFormValid.value) {
+  if (!isRegisterFormValid.value) {
     errorMessage.value = '请检查表单输入'
     return
   }
@@ -366,25 +669,76 @@ const handleRegister = async () => {
   }
 }
 
+// 通过邮箱验证码重置密码
+const handleResetPasswordByEmail = async () => {
+  validateResetEmail()
+  validateResetNewPassword()
+  validateResetConfirmPassword()
+
+  if (!isResetFormValid.value) {
+    errorMessage.value = '请检查表单输入'
+    return
+  }
+
+  errorMessage.value = ''
+  successMessage.value = ''
+  isSubmitting.value = true
+
+  try {
+    const result = await authService.resetPasswordByEmail(resetForm.value)
+    if (result.code === 200) {
+      successMessage.value = '密码重置成功，请使用新密码登录'
+      setTimeout(() => {
+        switchToLogin()
+      }, 800)
+    } else {
+      errorMessage.value = result.msg || '重置密码失败'
+    }
+  } catch (error) {
+    console.error('[UserAuthModal] 重置密码失败:', error)
+    errorMessage.value = '重置密码失败，请稍后重试'
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
 // 关闭模态框
 const handleClose = () => {
   // 重置表单
   loginForm.value = { loginIdentifier: '', password: '' }
-  registerForm.value = { username: '', password: '', email: '', phone: '' }
+  registerForm.value = { username: '', password: '', email: '', phone: '', code: '' }
   confirmPassword.value = ''
-  
+  resetForm.value = { email: '', code: '', newPassword: '' }
+  resetConfirmPassword.value = ''
+
+  // 清理倒计时
+  if (regTimer) {
+    window.clearInterval(regTimer)
+    regTimer = null
+  }
+  if (resetTimer) {
+    window.clearInterval(resetTimer)
+    resetTimer = null
+  }
+  regCodeCountdown.value = 0
+  resetCodeCountdown.value = 0
+
   // 重置错误信息
   usernameError.value = ''
   passwordError.value = ''
   confirmPasswordError.value = ''
   emailError.value = ''
   phoneError.value = ''
+  resetEmailError.value = ''
+  resetNewPasswordError.value = ''
+  resetConfirmPasswordError.value = ''
   errorMessage.value = ''
   successMessage.value = ''
-  
+
   // 重置为登录模式
   isLogin.value = true
-  
+  isForgotPassword.value = false
+
   emit('close')
 }
 </script>
