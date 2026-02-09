@@ -9,8 +9,7 @@ import type {
   ChangePasswordRequest,
   ResetPasswordByEmailRequest,
   UserInfo,
-  ApiResponse,
-  AvailabilityResponse
+  ApiResponse
 } from '../types/login'
 import { getApiBaseUrl } from '../config'
 

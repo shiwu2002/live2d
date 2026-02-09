@@ -7,10 +7,8 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { Application } from '@pixi/app'
 import { Ticker, TickerPlugin } from '@pixi/ticker'
 import { extensions } from '@pixi/extensions'
-import { Live2DModel } from 'pixi-live2d-display/cubism4'
+import type { Live2DModel as Live2DModelType } from 'pixi-live2d-display/cubism4'
 
-// 导入 ZIP 支持
-import 'pixi-live2d-display/cubism4'
 
 const props = defineProps<{
   modelPath: string
@@ -23,8 +21,11 @@ const props = defineProps<{
 
 const canvasContainer = ref<HTMLDivElement>()
 let app: Application | null = null
-let model: Live2DModel | null = null
-let lastTime = 0
+let model: Live2DModelType | null = null
+let mouseMoveRaf = 0
+let lastMouseX = 0
+let lastMouseY = 0
+let tickerRegistered = false
 
 // 眨眼状态
 const blinkState = {
@@ -33,8 +34,7 @@ const blinkState = {
   delayMs: 3000 + Math.random() * 5000
 }
 
-// 注册 Live2D Ticker
-Live2DModel.registerTicker(Ticker)
+ // 注册 Pixi Ticker 插件
 extensions.add(TickerPlugin)
 
 // 初始化 Pixi 应用
@@ -48,7 +48,7 @@ const initPixiApp = () => {
     width: width,
     height: height,
     backgroundAlpha: 0,
-    preserveDrawingBuffer: true,
+    preserveDrawingBuffer: false,
     autoDensity: true,
     resolution: window.devicePixelRatio || 1,
   })
@@ -61,6 +61,12 @@ const loadModel = async () => {
   if (!app) return
 
   try {
+    const { Live2DModel } = await import('pixi-live2d-display/cubism4')
+    if (!tickerRegistered) {
+      // 仅注册一次 Ticker，避免重复注册导致的潜在问题
+      Live2DModel.registerTicker(Ticker)
+      tickerRegistered = true
+    }
     model = await Live2DModel.from(props.modelPath, {
       autoInteract: false
     })
@@ -147,47 +153,78 @@ const updateBlink = (deltaTime: number) => {
   }
 }
 
-// 鼠标跟随
+ // 鼠标跟随（使用 rAF 节流，减少高频事件对主线程压力）
 const handleMouseMove = (event: MouseEvent) => {
   if (!model || !canvasContainer.value || !app) return
-
-  const rect = canvasContainer.value.getBoundingClientRect()
-  const x = ((event.clientX - rect.left) / rect.width) * app.screen.width
-  const y = ((event.clientY - rect.top) / rect.height) * app.screen.height
-
-  model.focus(x, y)
-}
-
-// 启动渲染循环
-const startRenderLoop = () => {
-  if (!app) return
-
-  lastTime = Date.now()
-
-  app.ticker.add(() => {
-    const now = Date.now()
-    const deltaTime = now - lastTime
-    lastTime = now
-
-    updateBlink(deltaTime)
+  lastMouseX = event.clientX
+  lastMouseY = event.clientY
+  if (mouseMoveRaf) return
+  mouseMoveRaf = window.requestAnimationFrame(() => {
+    mouseMoveRaf = 0
+    if (!model || !canvasContainer.value || !app) return
+    const rect = canvasContainer.value.getBoundingClientRect()
+    const x = ((lastMouseX - rect.left) / rect.width) * app.screen.width
+    const y = ((lastMouseY - rect.top) / rect.height) * app.screen.height
+    model.focus(x, y)
   })
 }
 
-// 组件挂载
+// 根据容器大小调整模型缩放与居中
+const adjustModelToContainer = () => {
+  if (!app || !model) return
+  const containerWidth = app.screen.width
+  const containerHeight = app.screen.height
+  const baseModelWidth = model.width / model.scale.x
+  const baseModelHeight = model.height / model.scale.y
+  const scaleX = (containerWidth * 0.8) / baseModelWidth
+  const scaleY = (containerHeight * 0.8) / baseModelHeight
+  const optimalScale = Math.min(scaleX, scaleY)
+  model.scale.set(optimalScale)
+  model.x = containerWidth / 2
+  model.y = containerHeight / 2
+}
+
+// 窗口尺寸变化时自适应
+const onResize = () => {
+  if (!app) return
+  const width = props.width || window.innerWidth
+  const height = props.height || window.innerHeight
+  app.renderer.resize(width, height)
+  adjustModelToContainer()
+}
+
+ // 启动渲染循环
+const startRenderLoop = () => {
+  if (!app) return
+
+  // 使用 app.ticker.deltaMS 获取毫秒增量，避免类型不匹配
+  app.ticker.add(() => {
+    if (app) updateBlink(app.ticker.deltaMS)
+  })
+}
+
+ // 组件挂载
 onMounted(async () => {
   initPixiApp()
   await loadModel()
   startRenderLoop()
 
-  // 添加鼠标跟随
+  // 添加鼠标跟随与自适应
   window.addEventListener('mousemove', handleMouseMove)
+  window.addEventListener('resize', onResize)
 })
 
-// 组件卸载
+ // 组件卸载
 onUnmounted(() => {
   window.removeEventListener('mousemove', handleMouseMove)
+  window.removeEventListener('resize', onResize)
+  if (mouseMoveRaf) {
+    cancelAnimationFrame(mouseMoveRaf)
+    mouseMoveRaf = 0
+  }
 
   if (app) {
+    app.ticker.stop()
     app.destroy(true, { children: true })
     app = null
   }
