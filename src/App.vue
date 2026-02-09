@@ -114,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import type { CSSProperties } from 'vue'
 import Live2DModel from './components/Live2DModel.vue'
 import ChatWindow from './components/ChatWindow.vue'
@@ -170,14 +170,32 @@ const widgetDragging = ref(false)
 let widgetDragOffsetX = 0
 let widgetDragOffsetY = 0
 
-const widgetStyle = computed<CSSProperties>(() => ({
-  position: 'fixed',
-  left: `${widgetPosX.value}px`,
-  top: `${widgetPosY.value}px`,
-  width: '320px'
-}))
+// 移动端断点与布局开关（小于等于768px 视为移动端）
+const isMobile = ref(false)
+const updateIsMobile = () => {
+  isMobile.value = window.innerWidth <= 768
+}
+
+const widgetStyle = computed<CSSProperties>(() => {
+  if (isMobile.value) {
+    // 移动端交由媒体查询与弹性布局控制，避免 inline 样式导致 position 固定
+    return {
+      position: 'static',
+      width: '100%'
+    }
+  }
+  // 桌面端保持可拖拽的小部件
+  return {
+    position: 'fixed',
+    left: `${widgetPosX.value}px`,
+    top: `${widgetPosY.value}px`,
+    width: '320px'
+  }
+})
 
 const startWidgetDrag = (e: MouseEvent) => {
+  // 移动端不启用拖拽，避免与滚动/点击冲突
+  if (isMobile.value) return
   widgetDragging.value = true
   widgetDragOffsetX = e.clientX - widgetPosX.value
   widgetDragOffsetY = e.clientY - widgetPosY.value
@@ -368,6 +386,9 @@ if (modelIds.length > 0) {
 logEnvConfig()
 
 onMounted(() => {
+  updateIsMobile()
+  window.addEventListener('resize', updateIsMobile)
+
   const w = window.innerWidth
   const h = window.innerHeight
   const width = 320
@@ -375,12 +396,16 @@ onMounted(() => {
   widgetPosX.value = Math.max(0, w - width - 20)
   widgetPosY.value = Math.max(0, h - Math.min(h - 20, height) - 20)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateIsMobile)
+})
 </script>
 
 <style scoped>
 .app-container {
   width: 100vw;
-  height: 100svh;
+  height: 100dvh;
   position: relative;
   overflow: hidden;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -719,10 +744,12 @@ onMounted(() => {
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  /* Live2D小窗口 - 全屏布局 */
+  /* Live2D小窗口 - 全屏布局（改为纵向弹性布局，避免头部/控件遮挡画布） */
   .live2d-widget {
     width: 100vw;
-    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
     bottom: 0;
     right: 0;
     top: 0;
@@ -732,15 +759,13 @@ onMounted(() => {
   }
   
   .widget-header {
-    position: fixed;
-    top: 10px;
-    left: 10px;
-    right: 10px;
-    z-index: 10;
+    position: static;
     padding: 8px 12px;
+    margin: calc(env(safe-area-inset-top) + 10px) 10px 8px;
     border-radius: 12px;
     background: rgba(102, 126, 234, 0.95);
     backdrop-filter: blur(10px);
+    z-index: 1;
   }
   
   .widget-title {
@@ -754,19 +779,19 @@ onMounted(() => {
   }
   
   .widget-body {
-    width: 100vw;
-    height: calc(100svh - env(safe-area-inset-top) - 120px);
-    position: fixed;
-    top: calc(env(safe-area-inset-top) + 120px);
+    width: 100%;
+    height: auto;
+    position: relative;
     left: 0;
+    flex: 1 1 auto; /* 占据剩余空间，避免与头部/控件重叠 */
+    min-height: 0;  /* 允许在弹性容器内正确收缩 */
+    overflow: hidden;
   }
   
   .widget-controls {
-    position: fixed;
-    top: calc(env(safe-area-inset-top) + 60px);
-    left: 10px;
-    right: 10px;
-    z-index: 10;
+    position: static;
+    margin: 8px 10px;
+    z-index: 1;
     padding: 8px 12px;
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
