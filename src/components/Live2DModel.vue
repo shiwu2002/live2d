@@ -26,6 +26,7 @@ let mouseMoveRaf = 0
 let lastMouseX = 0
 let lastMouseY = 0
 let tickerRegistered = false
+let resizeObserver: ResizeObserver | null = null
 
 // 眨眼状态
 const blinkState = {
@@ -41,8 +42,9 @@ extensions.add(TickerPlugin)
 const initPixiApp = () => {
   if (!canvasContainer.value) return
 
-  const width = props.width || window.innerWidth
-  const height = props.height || window.innerHeight
+  const rect = canvasContainer.value.getBoundingClientRect()
+  const width = Math.max(1, Math.floor(rect.width))
+  const height = Math.max(1, Math.floor(rect.height))
 
   app = new Application({
     width: width,
@@ -107,6 +109,9 @@ const loadModel = async () => {
     if (model.internalModel.motionManager) {
       await model.motion('idle', 0)
     }
+
+    // 初次加载后按容器尺寸再次自适应，避免移动端控件遮挡导致尺寸错误
+    adjustModelToContainer()
 
     console.log('Live2D 模型加载成功', {
       modelSize: { width: model.width, height: model.height },
@@ -186,9 +191,10 @@ const adjustModelToContainer = () => {
 
 // 窗口尺寸变化时自适应
 const onResize = () => {
-  if (!app) return
-  const width = props.width || window.innerWidth
-  const height = props.height || window.innerHeight
+  if (!app || !canvasContainer.value) return
+  const rect = canvasContainer.value.getBoundingClientRect()
+  const width = Math.max(1, Math.floor(rect.width))
+  const height = Math.max(1, Math.floor(rect.height))
   app.renderer.resize(width, height)
   adjustModelToContainer()
 }
@@ -212,6 +218,19 @@ onMounted(async () => {
   // 添加鼠标跟随与自适应
   window.addEventListener('mousemove', handleMouseMove)
   window.addEventListener('resize', onResize)
+
+  // 监听容器尺寸变化以适配移动端 UI 高度变化与旋转
+  if ('ResizeObserver' in window && canvasContainer.value) {
+    resizeObserver = new ResizeObserver(() => {
+      if (!app || !canvasContainer.value) return
+      const rect = canvasContainer.value.getBoundingClientRect()
+      const width = Math.max(1, Math.floor(rect.width))
+      const height = Math.max(1, Math.floor(rect.height))
+      app.renderer.resize(width, height)
+      adjustModelToContainer()
+    })
+    resizeObserver.observe(canvasContainer.value)
+  }
 })
 
  // 组件卸载
@@ -221,6 +240,11 @@ onUnmounted(() => {
   if (mouseMoveRaf) {
     cancelAnimationFrame(mouseMoveRaf)
     mouseMoveRaf = 0
+  }
+  if (resizeObserver && canvasContainer.value) {
+    resizeObserver.unobserve(canvasContainer.value)
+    resizeObserver.disconnect()
+    resizeObserver = null
   }
 
   if (app) {

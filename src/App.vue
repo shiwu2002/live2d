@@ -380,7 +380,7 @@ onMounted(() => {
 <style scoped>
 .app-container {
   width: 100vw;
-  height: 100vh;
+  height: 100svh;
   position: relative;
   overflow: hidden;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -755,15 +755,15 @@ onMounted(() => {
   
   .widget-body {
     width: 100vw;
-    height: 100vh;
+    height: calc(100svh - env(safe-area-inset-top) - 120px);
     position: fixed;
-    top: 0;
+    top: calc(env(safe-area-inset-top) + 120px);
     left: 0;
   }
   
   .widget-controls {
     position: fixed;
-    top: 60px;
+    top: calc(env(safe-area-inset-top) + 60px);
     left: 10px;
     right: 10px;
     z-index: 10;
@@ -782,7 +782,7 @@ onMounted(() => {
   /* 控制面板 - 放在模型选择器下方 */
   .control-panel {
     position: fixed;
-    top: 118px;
+    top: calc(env(safe-area-inset-top) + 118px);
     left: 10px;
     right: 10px;
     bottom: auto;
@@ -811,7 +811,7 @@ onMounted(() => {
   /* 用户信息面板 - 放在控制面板下方 */
   .user-info-panel {
     position: fixed;
-    top: 200px;
+    top: calc(env(safe-area-inset-top) + 200px);
     left: 10px;
     right: 10px;
     bottom: auto;
