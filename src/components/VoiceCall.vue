@@ -23,9 +23,7 @@
               <span class="avatar-icon">
                 <span v-if="callState === 'idle' || callState === 'error'">🤖</span>
                 <span v-else-if="callState === 'connecting'">📡</span>
-                <span v-else-if="callState === 'talking'">🎤</span>
-                <span v-else-if="callState === 'listening'">👂</span>
-                <span v-else>💬</span>
+                <span v-else>🎤</span>  <!-- 通话中始终显示麦克风 -->
               </span>
             </div>
           </div>
@@ -39,37 +37,6 @@
           <!-- 通话时长 -->
           <div class="call-duration" v-if="isInCall && callState !== 'error'">
             {{ callDuration }}
-          </div>
-        </div>
-
-        <!-- 文本信息区域（可折叠） -->
-        <div class="info-section" v-if="recognitionText || aiReplyText || errorMessage">
-          <!-- 识别文本 -->
-          <div class="info-card recognition-card" v-if="recognitionText">
-            <div class="card-label">
-              <span class="label-icon">🎙️</span>
-              <span>你说</span>
-            </div>
-            <div class="card-content">{{ recognitionText }}</div>
-          </div>
-
-          <!-- AI回复 -->
-          <div class="info-card ai-card" v-if="aiReplyText">
-            <div class="card-label">
-              <span class="label-icon">💬</span>
-              <span>AI回复</span>
-              <span class="streaming-dot" v-if="!aiReplyFinal"></span>
-            </div>
-            <div class="card-content">{{ aiReplyText }}</div>
-          </div>
-
-          <!-- 错误信息 -->
-          <div class="info-card error-card" v-if="errorMessage">
-            <div class="card-label">
-              <span class="label-icon">⚠️</span>
-              <span>错误</span>
-            </div>
-            <div class="card-content">{{ errorMessage }}</div>
           </div>
         </div>
 
@@ -87,22 +54,11 @@
           <div class="volume-value">{{ volume }}</div>
         </div>
       </div>
-
+      
       <!-- 底部控制按钮 -->
       <div class="call-controls">
-        <!-- 未通话状态 -->
-        <div class="control-row" v-if="!isInCall">
-          <button
-            class="control-btn control-btn-call"
-            @click="handleStartCall"
-            :disabled="callState === 'connecting'"
-          >
-            <span class="control-icon">📞</span>
-          </button>
-        </div>
-
         <!-- 通话中状态 -->
-        <div class="control-row" v-else>
+        <div class="control-row" v-if="isInCall">
           <!-- 暂停/继续 -->
           <button
             class="control-btn control-btn-secondary"
@@ -117,8 +73,8 @@
           <button
             class="control-btn control-btn-interrupt"
             @click="handleInterrupt"
-            :disabled="callState !== 'listening'"
-            title="打断AI"
+            :disabled="callState === 'connecting' || callState === 'idle' || callState === 'error'"
+            title="打断 AI"
           >
             <span class="control-icon">✋</span>
           </button>
@@ -292,9 +248,9 @@ const handleToggleRecording = () => {
   }
 }
 
-// 打断AI回复
+// 打断 AI 回复（暂停 TTS 播放）
 const handleInterrupt = () => {
-  voiceCallManager.value?.interrupt()
+  voiceCallManager.value?.pauseTts()
 }
 
 // 音量变化
@@ -314,10 +270,12 @@ const handleClose = () => {
   }
 }
 
-// 监听visible变化
+// 监听 visible 变化
 watch(() => props.visible, (newVal) => {
   if (newVal && !voiceCallManager.value) {
     initVoiceCallManager()
+    // 自动开始通话
+    handleStartCall()
   }
 })
 
@@ -325,6 +283,8 @@ watch(() => props.visible, (newVal) => {
 onMounted(() => {
   if (props.visible) {
     initVoiceCallManager()
+    // 自动开始通话
+    handleStartCall()
   }
 })
 

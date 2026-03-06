@@ -87,8 +87,13 @@ export class VoiceCallManager {
     this.wsService.onConnection((connected) => {
       if (connected) {
         this.updateState('connected')
-        // 发送开启WebSocket功能的控制命令
+        // 发送开启 WebSocket 功能的控制命令
         this.wsService.sendControl('open_websocket')
+        
+        // WebSocket 开启后开始录音
+        this.startRecording()
+        this.updateState('talking')
+        console.log('语音通话已开始')
       } else {
         this.updateState('idle')
       }
@@ -117,14 +122,19 @@ export class VoiceCallManager {
       
       console.log('收到流式AI回复:', aiContent)
     } else if (text === 'ai_reply_complete') {
-      // AI回复完成标记
-      console.log('AI回复完成，总内容:', this.aiReplyBuffer)
-      
-      // 通知AI回复完成（最终）
+      // AI 回复完成标记
+      console.log('AI 回复完成，总内容:', this.aiReplyBuffer)
+          
+      // 通知 AI 回复完成（最终）
       this.notifyAiReply(this.aiReplyBuffer, true)
-      
+          
       // 清空缓冲区
       this.aiReplyBuffer = ''
+          
+      // 恢复录音状态
+      if (this.state === 'listening') {
+        this.resumeRecording()
+      }
     } else {
       // 其他文本消息（如识别结果）
       this.notifyRecognition(text)
@@ -139,22 +149,15 @@ export class VoiceCallManager {
       console.warn('通话已在进行中或正在连接')
       return
     }
-
+  
     try {
       this.updateState('connecting')
-
-      // 连接WebSocket
+  
+      // 连接 WebSocket
       await this.wsService.connect()
-
-      // 开始录音并发送音频数据
-      await this.audioRecorder.start((audioData) => {
-        if (this.wsService.isConnected()) {
-          this.wsService.sendAudio(audioData)
-        }
-      })
-
-      this.updateState('talking')
-      console.log('语音通话已开始')
+  
+      // 等待 WebSocket 连接成功后会自动发送 open_websocket 命令
+      // 并开始录音
     } catch (error) {
       this.handleError(error instanceof Error ? error : new Error('启动通话失败'))
       throw error
@@ -195,6 +198,17 @@ export class VoiceCallManager {
   }
 
   /**
+   * 开始录音（内部使用）
+   */
+  private startRecording(): void {
+    this.audioRecorder.start((audioData) => {
+      if (this.wsService.isConnected()) {
+        this.wsService.sendAudio(audioData)
+      }
+    })
+  }
+
+  /**
    * 恢复录音
    */
   resumeRecording(): void {
@@ -203,39 +217,62 @@ export class VoiceCallManager {
   }
 
   /**
-   * 打断当前对话
+   * 打断当前对话（完全打断 ASR、LLM、TTS）
    */
   interrupt(): void {
     // 停止播放
     this.audioPlayer.stop()
-
-    // 清空AI回复缓冲区
+  
+    // 清空 AI 回复缓冲区
     this.aiReplyBuffer = ''
-
+  
     // 发送打断命令
     if (this.wsService.isConnected()) {
       this.wsService.sendControl('interrupt')
     }
-
+  
     // 恢复录音
     this.resumeRecording()
   }
+  
+  /**
+   * 暂停 TTS 音频播放（仅暂停播放，不清除 LLM 生成）
+   */
+  pauseTts(): void {
+    // 停止播放
+    this.audioPlayer.stop()
+  
+    // 清空 AI 回复缓冲区
+    this.aiReplyBuffer = ''
+  
+    // 发送暂停 TTS 命令给后端
+    if (this.wsService.isConnected()) {
+      this.wsService.sendControl('pause_tts')
+    }
+  
+    // 暂停后自动恢复录音，允许用户立即提问
+    if (this.state === 'listening') {
+      this.resumeRecording()
+    }
+  
+    console.log('已发送暂停 TTS 命令')
+  }
 
   /**
-   * 处理接收到的音频数据（v2.0.0：MP3格式）
+   * 处理接收到的音频数据（v2.0.0：MP3 格式）
    */
   private async handleReceivedAudio(audioData: ArrayBuffer): Promise<void> {
     try {
       // 调试：检查接收到的数据
       console.log('收到音频数据，大小:', audioData.byteLength, 'bytes')
-      
+        
       // 验证数据有效性
       if (!audioData || audioData.byteLength === 0) {
         console.warn('收到空音频数据，跳过播放')
         return
       }
-      
-      // 检查是否为有效的MP3数据（MP3文件头通常以 0xFF 0xFB 或 0xFF 0xF3 开头）
+        
+      // 检查是否为有效的 MP3 数据（MP3 文件头通常以 0xFF 0xFB 或 0xFF 0xF3 开头）
       const view = new Uint8Array(audioData)
       if (view.length >= 2) {
         const firstByte = view[0] as number
@@ -245,13 +282,18 @@ export class VoiceCallManager {
           '0x' + secondByte.toString(16).padStart(2, '0').toUpperCase()
         )
       }
-      
-      // 播放TTS音频（MP3格式）
-      await this.audioPlayer.play(audioData)
-      
-      // 播放AI回复时暂停录音
+        
+      // 播放 AI 回复时暂停录音
       if (this.state === 'talking') {
         this.pauseRecording()
+      }
+        
+      // 播放 TTS 音频（MP3 格式）
+      await this.audioPlayer.play(audioData)
+        
+      // 播放完成后自动恢复录音
+      if (this.state === 'listening') {
+        this.resumeRecording()
       }
     } catch (error) {
       console.error('播放音频失败:', error)
@@ -263,17 +305,51 @@ export class VoiceCallManager {
    */
   private handleControlMessage(content: any): void {
     const command = typeof content === 'string' ? content : content?.command
-    
+      
     switch (command) {
-      case 'connected':
-        console.log('WebSocket已连接')
+      case 'websocket_opened':
+        console.log('WebSocket 已开启')
+        // WebSocket 已开启，可以开始发送音频
         break
+            
+      case 'websocket_closed':
+        console.log('WebSocket 已关闭')
+        break
+            
       case 'start_recording':
+        console.log('收到开始录音指令')
         this.resumeRecording()
         break
+            
       case 'stop_recording':
+        console.log('收到停止录音指令')
         this.pauseRecording()
         break
+            
+      case 'tts_paused':
+        console.log('TTS 已暂停（后端响应）')
+        // 后端已暂停 TTS，前端停止播放并清空缓冲区
+        this.audioPlayer.stop()
+        // 清空 AI 回复缓冲区，准备接收新的回复
+        this.aiReplyBuffer = ''
+        // 录音状态已在 pauseTts() 中恢复，这里不需要处理
+        break
+            
+      case 'interrupt':
+        console.log('收到打断指令（后端响应）')
+        // 完全打断：停止播放、清空缓冲
+        this.audioPlayer.stop()
+        this.aiReplyBuffer = ''
+        // 恢复录音，允许用户继续说话
+        if (this.state === 'listening') {
+          this.resumeRecording()
+        }
+        break
+            
+      case 'connected':
+        console.log('WebSocket 已连接')
+        break
+            
       default:
         console.log('收到控制消息:', command)
     }
@@ -387,18 +463,16 @@ export class VoiceCallManager {
 
   /**
    * 设置音量
-   * 注意：新版AudioPlayer暂未实现音量控制，此方法为占位符
    */
-  setVolume(_volume: number): void {
-    console.warn('音量控制功能待实现')
+  setVolume(volume: number): void {
+    this.audioPlayer.setVolume(volume)
   }
-
+  
   /**
    * 获取音量
-   * 注意：新版AudioPlayer暂未实现音量控制，此方法为占位符
    */
   getVolume(): number {
-    return 1.0
+    return this.audioPlayer.getVolume()
   }
 
   /**

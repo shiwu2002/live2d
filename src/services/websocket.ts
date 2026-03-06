@@ -18,6 +18,7 @@ export type ControlCommand =
   | 'stop_recording'
   | 'start_recognition'
   | 'interrupt'
+  | 'pause_tts'
 
 // 基础消息接口
 export interface BaseMessage {

@@ -6,9 +6,11 @@
 export class AudioPlayer {
   private audioQueue: Blob[] = []
   private isProcessingQueue = false
-  private mp3ChunkBuffer: ArrayBuffer[] = [] // 累积MP3片段
+  private mp3ChunkBuffer: ArrayBuffer[] = [] // 累积 MP3 片段
   private chunkTimeout: number | null = null
-  private readonly CHUNK_WAIT_MS = 320 // 等待320ms没有新片段后开始播放
+  private readonly CHUNK_WAIT_MS = 320 // 等待 320ms 没有新片段后开始播放
+  private currentAudio: HTMLAudioElement | null = null
+  private volume = 1.0
 
   /**
    * 播放MP3音频数据
@@ -108,30 +110,36 @@ export class AudioPlayer {
   }
 
   /**
-   * 播放单个Blob
+   * 播放单个 Blob
    */
   private async playBlob(blob: Blob): Promise<void> {
     return new Promise((resolve, reject) => {
       const audio = new Audio()
       const url = URL.createObjectURL(blob)
-      
+        
       audio.src = url
-      
+      audio.volume = this.volume
+        
+      this.currentAudio = audio
+        
       audio.onended = () => {
         console.log('音频播放结束，释放资源')
         URL.revokeObjectURL(url)
+        this.currentAudio = null
         resolve()
       }
-      
+        
       audio.onerror = (error) => {
-        console.error('Audio元素播放错误:', error)
+        console.error('Audio 元素播放错误:', error)
         URL.revokeObjectURL(url)
+        this.currentAudio = null
         reject(error)
       }
-      
+        
       audio.play().catch((error) => {
-        console.error('调用audio.play()失败:', error)
+        console.error('调用 audio.play() 失败:', error)
         URL.revokeObjectURL(url)
+        this.currentAudio = null
         reject(error)
       })
     })
@@ -142,6 +150,10 @@ export class AudioPlayer {
    */
   stop(): void {
     console.log('停止播放，清空队列')
+    if (this.currentAudio) {
+      this.currentAudio.pause()
+      this.currentAudio = null
+    }
     this.audioQueue = []
     this.mp3ChunkBuffer = []
     if (this.chunkTimeout !== null) {
@@ -149,6 +161,26 @@ export class AudioPlayer {
       this.chunkTimeout = null
     }
     this.isProcessingQueue = false
+  }
+
+  /**
+   * 设置音量
+   * @param volume 音量值，范围 0.0 - 1.0
+   */
+  setVolume(volume: number): void {
+    this.volume = Math.max(0, Math.min(1, volume))
+    if (this.currentAudio) {
+      this.currentAudio.volume = this.volume
+    }
+    console.log('音量设置为:', this.volume)
+  }
+
+  /**
+   * 获取当前音量
+   * @returns 音量值，范围 0.0 - 1.0
+   */
+  getVolume(): number {
+    return this.volume
   }
 
   /**
