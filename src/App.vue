@@ -86,11 +86,29 @@
       </div>
       
       <div class="widget-controls" v-show="isWidgetVisible">
-        <select v-model="currentModel" class="model-selector">
-          <option v-for="model in discoveredModels" :key="model.id" :value="model.id">
-            {{ model.name }}
-          </option>
-        </select>
+        <div class="model-control-group">
+          <select v-model="currentModel" class="model-selector" title="Live2D 模型选择">
+            <option v-for="model in discoveredModels" :key="model.id" :value="model.id">
+              {{ model.name }}
+            </option>
+          </select>
+          
+          <!-- AI 模型选择器 -->
+          <select 
+            v-model="selectedAiModel" 
+            class="model-selector ai-model-selector"
+            @change="handleAiModelChange"
+            :disabled="aiModelsLoading || !isLoggedIn"
+            title="AI 模型选择（需先登录）"
+          >
+            <option value="" disabled>
+              {{ aiModelsLoading ? '加载中...' : (isLoggedIn ? '选择 AI 模型' : '请先登录') }}
+            </option>
+            <option v-for="model in aiModels" :key="model.fullIdentifier" :value="model.fullIdentifier">
+              {{ model.vendorName }} - {{ model.modelName }}{{ model.isDefault ? ' (推荐)' : '' }}
+            </option>
+          </select>
+        </div>
       </div>
     </div>
     
@@ -125,6 +143,7 @@ import { getChatConfig, generateSessionId } from './config'
 import { getWebSocketUrl, logEnvConfig } from './config'
 import type { UserLoginInfo, UserInfo } from './types/login'
 import { authService } from './services/authService'
+import { aiModelConfigService, aiModelSwitchService, type ModelConfig } from './services/aiModelConfig'
 
 // 模型信息接口
 interface ModelInfo {
@@ -233,6 +252,11 @@ const showUserAuthModal = ref(false)
 const isLoggedIn = ref(false)
 const currentUser = ref<UserLoginInfo | null>(null)
 
+// AI 模型相关状态
+const aiModels = ref<ModelConfig[]>([])
+const selectedAiModel = ref<string>('')
+const aiModelsLoading = ref(false)
+
 // WebSocket 配置（从环境配置加载）
 const wsConfig = ref(getChatConfig({
   baseUrl: getWebSocketUrl('chat'), // 从环境配置读取聊天服务WebSocket地址
@@ -307,9 +331,9 @@ const toggleUserAuthModal = () => {
 const handleUserAuthLoginSuccess = (userInfo: UserInfo) => {
   console.log('用户名密码登录成功:', userInfo)
   
-  // 将UserInfo转换为UserLoginInfo格式以兼容现有逻辑
+  // 将 UserInfo 转换为 UserLoginInfo 格式以兼容现有逻辑
   const loginInfo: UserLoginInfo = {
-    openid: userInfo.userId, // 使用userId作为openid
+    openid: userInfo.userId, // 使用 userId 作为 openid
     nickname: userInfo.nickname || userInfo.username,
     avatar: userInfo.avatar || '',
     sessionId: userInfo.aiSessionId || generateSessionId()
@@ -318,7 +342,7 @@ const handleUserAuthLoginSuccess = (userInfo: UserInfo) => {
   isLoggedIn.value = true
   currentUser.value = loginInfo
   
-  // 更新WebSocket配置
+  // 更新 WebSocket 配置
   wsConfig.value.openid = loginInfo.openid
   wsConfig.value.aiSessionId = loginInfo.sessionId
   
@@ -328,6 +352,9 @@ const handleUserAuthLoginSuccess = (userInfo: UserInfo) => {
   localStorage.setItem('authToken', userInfo.token)
   
   console.log('登录状态已更新，sessionId:', loginInfo.sessionId)
+  
+  // 登录成功后加载 AI 模型列表
+  loadAiModels()
 }
 
 // 处理用户注册成功
@@ -349,6 +376,57 @@ const handleLogout = () => {
   console.log('已退出登录')
 }
 
+/**
+ * 加载 AI 模型列表
+ */
+const loadAiModels = async () => {
+  if (!isLoggedIn.value) {
+    aiModels.value = []
+    return
+  }
+
+  aiModelsLoading.value = true
+  try {
+    const models = await aiModelConfigService.getDisplayModels()
+    aiModels.value = models
+    
+    // 如果有默认模型，自动选中
+    const defaultModel = models.find(m => m.isDefault)
+    if (defaultModel) {
+      selectedAiModel.value = defaultModel.fullIdentifier
+    } else if (models.length > 0 && models[0]) {
+      selectedAiModel.value = models[0].fullIdentifier
+    }
+    
+    console.log('AI 模型列表加载成功:', models.length)
+  } catch (error) {
+    console.error('加载 AI 模型列表失败:', error)
+    alert('加载 AI 模型列表失败，请检查后端服务')
+  } finally {
+    aiModelsLoading.value = false
+  }
+}
+
+/**
+ * 处理 AI 模型切换
+ */
+const handleAiModelChange = async () => {
+  if (!selectedAiModel.value || !isLoggedIn.value) {
+    return
+  }
+
+  try {
+    console.log('切换 AI 模型:', selectedAiModel.value)
+    await aiModelSwitchService.switchModel(selectedAiModel.value)
+    console.log('AI 模型切换成功')
+  } catch (error: any) {
+    console.error('AI 模型切换失败:', error)
+    alert(`切换失败：${error.message}`)
+    // 切换失败时重置为之前的模型
+    loadAiModels()
+  }
+}
+
 // 初始化时检查本地存储的登录状态
 const checkLoginStatus = () => {
   const savedLoginStatus = localStorage.getItem('isLoggedIn')
@@ -360,11 +438,14 @@ const checkLoginStatus = () => {
       isLoggedIn.value = true
       currentUser.value = userInfo
       
-      // 更新WebSocket配置
+      // 更新 WebSocket 配置
       wsConfig.value.openid = userInfo.openid
-      wsConfig.value.aiSessionId = userInfo.sessionId // 恢复正确的sessionId
+      wsConfig.value.aiSessionId = userInfo.sessionId // 恢复正确的 sessionId
       
       console.log('恢复登录状态 - openid:', userInfo.openid, 'sessionId:', userInfo.sessionId)
+      
+      // 恢复登录状态后加载 AI 模型列表
+      loadAiModels()
     } catch (error) {
       console.error('解析本地登录信息失败:', error)
       handleLogout()
@@ -535,6 +616,33 @@ onUnmounted(() => {
   padding: 12px 16px;
   background: #f8f9fa;
   border-top: 1px solid #e9ecef;
+}
+
+.model-control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ai-model-selector {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.ai-model-selector:hover:not(:disabled) {
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
+}
+
+.ai-model-selector:focus {
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
+}
+
+.ai-model-selector:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #ccc;
 }
 
 .model-selector {

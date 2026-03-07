@@ -86,12 +86,12 @@ export class AuthService {
       if (!data.loginIdentifier || !data.password) {
         throw new Error('登录账号和密码不能为空')
       }
-
+  
       // 构建表单数据
       const formData = new URLSearchParams()
       formData.append('loginIdentifier', data.loginIdentifier)
       formData.append('password', data.password)
-
+  
       const response = await fetch(`${this.baseUrl}/auth/login`, {
         method: 'POST',
         headers: {
@@ -99,14 +99,27 @@ export class AuthService {
         },
         body: formData.toString()
       })
-
-      const result: ApiResponse<UserInfo> = await response.json()
-
+  
+      // 先检查响应状态
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+  
+      // 尝试解析 JSON
+      const text = await response.text()
+      let result: ApiResponse<UserInfo>
+      try {
+        result = JSON.parse(text)
+      } catch (e) {
+        console.error('[AuthService] 登录响应解析失败，原始响应:', text)
+        throw new Error('服务器响应格式错误')
+      }
+  
       if (result.code === 200 && result.data) {
-        // 保存token和用户信息
+        // 保存 token 和用户信息
         this.saveAuthData(result.data)
       }
-
+  
       return result
     } catch (error) {
       console.error('[AuthService] 登录失败:', error)

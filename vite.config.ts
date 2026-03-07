@@ -5,6 +5,26 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig({
   plugins: [vue()],
   base: '/live2d/',
+  
+  // 开发服务器配置
+  server: {
+    port: 5173,
+    proxy: {
+      // 代理 API 请求到后端服务器，解决 CORS 问题
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        rewrite: (path) => path
+      },
+      // 代理认证接口
+      '/auth': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        rewrite: (path) => path
+      }
+    }
+  },
+  
   build: {
     target: 'es2020',
     sourcemap: false,

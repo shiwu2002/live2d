@@ -64,7 +64,8 @@ export interface AudioConfig {
 // 开发环境配置
 const developmentConfig: EnvConfig = {
   env: 'development',
-  apiBaseUrl: 'http://localhost:8080',
+  // 开发环境下使用相对路径，通过 Vite 代理转发到后端
+  apiBaseUrl: '',  // 使用相对路径 /api
   wsBaseUrl: 'ws://localhost:8080',
   wsEndpoints: {
     chat: '/ws/chat',
@@ -93,8 +94,8 @@ export const defaultChatConfig: ChatConfig = {
   // WebSocket 服务器地址（通过 getWebSocketUrl 动态获取）
   baseUrl: 'wss://shiwu.shop',  // 使用 wss:// 协议
   
-  // 用户唯一标识（实际使用时应从登录系统获取）
-  openid: 'test_user_001',
+  // 用户唯一标识（实际使用时应从登录系统获取，未登录时为空）
+  openid: '',  // 必须登录后才有值
   
   // AI 会话 ID（使用时间戳生成，实际可使用 UUID）
   aiSessionId: `session_${Date.now()}`,
