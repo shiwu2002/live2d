@@ -72,6 +72,10 @@
           <button class="control-btn" @click="toggleWidget" title="显示/隐藏">
             <span>{{ isWidgetVisible ? '👁️' : '👁️‍🗨️' }}</span>
           </button>
+          <!-- 移动端用户名显示 -->
+          <div v-if="isLoggedIn && currentUser" class="mobile-user-name">
+            {{ currentUser.nickname || '微信用户' }}
+          </div>
         </div>
       </div>
       
@@ -789,6 +793,11 @@ onUnmounted(() => {
   text-align: left;
 }
 
+/* 移动端用户名显示 */
+.mobile-user-name {
+  display: none;
+}
+
 /* 用户信息面板 */
 .user-info-panel {
   position: fixed;
@@ -886,6 +895,20 @@ onUnmounted(() => {
     font-size: 16px;
   }
   
+  .widget-toolbar {
+    position: static;
+    margin: 8px 10px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    border: none;
+  }
+  
+  .toolbar-buttons {
+    justify-content: center;
+  }
+  
   .widget-body {
     width: 100%;
     height: auto;
@@ -912,28 +935,6 @@ onUnmounted(() => {
     font-size: 13px;
   }
   
-  /* 控制面板 - 放在模型选择器下方 */
-  .control-panel {
-    position: fixed;
-    top: calc(env(safe-area-inset-top) + 118px);
-    left: 10px;
-    right: 10px;
-    bottom: auto;
-    z-index: 10;
-    padding: 12px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-  }
-  
-  .control-buttons {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 8px;
-    justify-content: center;
-    max-width: 100%;
-  }
-  
   .control-btn {
     width: 44px;
     height: 44px;
@@ -941,31 +942,27 @@ onUnmounted(() => {
     border-radius: 10px;
   }
   
-  /* 用户信息面板 - 放在控制面板下方 */
+  /* 移动端用户名显示 - 显示在按钮旁边 */
+  .mobile-user-name {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 10px 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  }
+  
+  /* 移动端隐藏独立的用户信息面板 */
   .user-info-panel {
-    position: fixed;
-    top: calc(env(safe-area-inset-top) + 200px);
-    left: 10px;
-    right: 10px;
-    bottom: auto;
-    z-index: 10;
-    padding: 8px 12px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-  }
-  
-  .user-avatar {
-    width: 36px;
-    height: 36px;
-  }
-  
-  .user-nickname {
-    font-size: 13px;
-  }
-  
-  .user-id {
-    font-size: 10px;
+    display: none;
   }
   
   .main-content h1 {
