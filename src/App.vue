@@ -98,20 +98,25 @@
           </select>
           
           <!-- AI 模型选择器 -->
-          <select 
-            v-model="selectedAiModel" 
-            class="model-selector ai-model-selector"
-            @change="handleAiModelChange"
-            :disabled="aiModelsLoading || !isLoggedIn"
-            title="AI 模型选择（需先登录）"
-          >
-            <option value="" disabled>
-              {{ aiModelsLoading ? '加载中...' : (isLoggedIn ? '选择 AI 模型' : '请先登录') }}
-            </option>
-            <option v-for="model in aiModels" :key="model.fullIdentifier" :value="model.fullIdentifier">
-              {{ model.vendorName }} - {{ model.modelName }}{{ model.isDefault ? ' (推荐)' : '' }}
-            </option>
-          </select>
+          <div class="ai-model-selector-wrapper">
+            <select
+              v-model="selectedAiModel"
+              class="model-selector ai-model-selector"
+              @change="handleAiModelChange"
+              :disabled="aiModelsLoading || isSavingPreference || !isLoggedIn"
+              title="AI 模型选择（需先登录）"
+            >
+              <option value="" disabled>
+                {{ aiModelsLoading ? '加载中...' : (isSavingPreference ? '保存中...' : (isLoggedIn ? '选择 AI 模型' : '请先登录')) }}
+              </option>
+              <option v-for="model in aiModels" :key="model.fullIdentifier" :value="model.fullIdentifier">
+                {{ model.protocolName }} - {{ model.modelName }}{{ model.isDefault ? ' (推荐)' : '' }}
+              </option>
+            </select>
+            <div v-if="preferenceMessage" class="preference-message" :class="preferenceMessage.type">
+              {{ preferenceMessage.text }}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -260,10 +265,23 @@ const currentUser = ref<UserLoginInfo | null>(null)
 const aiModels = ref<ModelConfig[]>([])
 const selectedAiModel = ref<string>('')
 const aiModelsLoading = ref(false)
+const isSavingPreference = ref(false)
+const preferenceMessage = ref<{ text: string; type: 'success' | 'error' } | null>(null)
+
+// 生成匿名用户ID的函数
+const generateAnonymousUserId = (): string => {
+  let anonymousId = localStorage.getItem('anonymousUserId')
+  if (!anonymousId) {
+    anonymousId = `anonymous_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+    localStorage.setItem('anonymousUserId', anonymousId)
+  }
+  return anonymousId
+}
 
 // WebSocket 配置（从环境配置加载）
 const wsConfig = ref(getChatConfig({
   baseUrl: getWebSocketUrl('chat'), // 从环境配置读取聊天服务WebSocket地址
+  openid: generateAnonymousUserId(), // 默认使用匿名ID
   aiSessionId: generateSessionId()
 }))
 
@@ -335,9 +353,9 @@ const toggleUserAuthModal = () => {
 const handleUserAuthLoginSuccess = (userInfo: UserInfo) => {
   console.log('用户名密码登录成功:', userInfo)
   
-  // 将 UserInfo 转换为 UserLoginInfo 格式以兼容现有逻辑
+  // 将UserInfo转换为UserLoginInfo格式以兼容现有逻辑
   const loginInfo: UserLoginInfo = {
-    openid: userInfo.userId, // 使用 userId 作为 openid
+    openid: userInfo.userId, // 使用userId作为openid
     nickname: userInfo.nickname || userInfo.username,
     avatar: userInfo.avatar || '',
     sessionId: userInfo.aiSessionId || generateSessionId()
@@ -346,7 +364,7 @@ const handleUserAuthLoginSuccess = (userInfo: UserInfo) => {
   isLoggedIn.value = true
   currentUser.value = loginInfo
   
-  // 更新 WebSocket 配置
+  // 更新WebSocket配置
   wsConfig.value.openid = loginInfo.openid
   wsConfig.value.aiSessionId = loginInfo.sessionId
   
@@ -373,6 +391,11 @@ const handleUserAuthRegisterSuccess = (userInfo: UserInfo) => {
 const handleLogout = () => {
   isLoggedIn.value = false
   currentUser.value = null
+  
+  // 重新生成匿名ID，或者保留原ID取决于业务需求
+  wsConfig.value.openid = generateAnonymousUserId()
+  wsConfig.value.aiSessionId = generateSessionId()
+  
   localStorage.removeItem('userInfo')
   localStorage.removeItem('isLoggedIn')
   localStorage.removeItem('authToken')
@@ -384,50 +407,91 @@ const handleLogout = () => {
  * 加载 AI 模型列表
  */
 const loadAiModels = async () => {
-  if (!isLoggedIn.value) {
+  if (!isLoggedIn.value || !currentUser.value) {
     aiModels.value = []
     return
   }
 
   aiModelsLoading.value = true
   try {
-    const models = await aiModelConfigService.getDisplayModels()
+    // 使用 display API 获取模型列表，并合并健康状态
+    const models = await aiModelConfigService.getDisplayModelsWithHealth()
     aiModels.value = models
-    
-    // 如果有默认模型，自动选中
-    const defaultModel = models.find(m => m.isDefault)
-    if (defaultModel) {
-      selectedAiModel.value = defaultModel.fullIdentifier
-    } else if (models.length > 0 && models[0]) {
-      selectedAiModel.value = models[0].fullIdentifier
+
+    // 尝试加载用户的偏好设置
+    const preference = await aiModelSwitchService.getUserPreference(currentUser.value.openid)
+    if (preference && preference.hasCustomPreference) {
+      // 检查偏好的模型是否在可用列表中
+      const preferredModel = models.find(m => m.fullIdentifier === preference.preferredModel)
+      if (preferredModel) {
+        selectedAiModel.value = preference.preferredModel
+        console.log('已加载用户模型偏好:', preference.preferredModel)
+      } else if (models.length > 0) {
+        // 如果偏好的模型不可用，使用第一个可用的
+        selectDefaultModel(models)
+      }
+    } else if (models.length > 0) {
+      // 没有偏好时，选择默认或第一个模型
+      selectDefaultModel(models)
     }
-    
-    console.log('AI 模型列表加载成功:', models.length)
+
+    console.log('AI 模型列表加载成功:', aiModels.value.length)
   } catch (error) {
     console.error('加载 AI 模型列表失败:', error)
-    alert('加载 AI 模型列表失败，请检查后端服务')
+    showMessage('加载 AI 模型列表失败', 'error')
   } finally {
     aiModelsLoading.value = false
   }
 }
 
 /**
+ * 选择默认模型
+ */
+const selectDefaultModel = (models: ModelConfig[]) => {
+  const defaultModel = models.find(m => m.isDefault)
+  if (defaultModel) {
+    selectedAiModel.value = defaultModel.fullIdentifier
+  } else if (models.length > 0) {
+    // 按优先级排序，选择优先级最高的
+    const sorted = [...models].sort((a, b) => a.priority - b.priority)
+    selectedAiModel.value = sorted[0].fullIdentifier
+  }
+}
+
+/**
+ * 显示消息提示
+ */
+const showMessage = (text: string, type: 'success' | 'error') => {
+  preferenceMessage.value = { text, type }
+  setTimeout(() => {
+    preferenceMessage.value = null
+  }, 3000)
+}
+
+/**
  * 处理 AI 模型切换
  */
 const handleAiModelChange = async () => {
-  if (!selectedAiModel.value || !isLoggedIn.value) {
+  if (!selectedAiModel.value || !isLoggedIn.value || !currentUser.value) {
     return
   }
 
+  isSavingPreference.value = true
   try {
-    console.log('切换 AI 模型:', selectedAiModel.value)
-    await aiModelSwitchService.switchModel(selectedAiModel.value)
-    console.log('AI 模型切换成功')
+    console.log('设置用户模型偏好:', selectedAiModel.value)
+    const result = await aiModelSwitchService.setUserPreference(
+      currentUser.value.openid,
+      selectedAiModel.value
+    )
+    console.log('模型偏好设置成功:', result)
+    showMessage(result.message || '模型偏好已保存', 'success')
   } catch (error: any) {
-    console.error('AI 模型切换失败:', error)
-    alert(`切换失败：${error.message}`)
-    // 切换失败时重置为之前的模型
+    console.error('设置模型偏好失败:', error)
+    showMessage(`设置失败：${error.message || '未知错误'}`, 'error')
+    // 切换失败时重新加载
     loadAiModels()
+  } finally {
+    isSavingPreference.value = false
   }
 }
 
@@ -454,6 +518,9 @@ const checkLoginStatus = () => {
       console.error('解析本地登录信息失败:', error)
       handleLogout()
     }
+  } else {
+    // 如果未登录，确保使用匿名ID
+    wsConfig.value.openid = generateAnonymousUserId()
   }
 }
 
@@ -628,11 +695,50 @@ onUnmounted(() => {
   gap: 10px;
 }
 
+.ai-model-selector-wrapper {
+  position: relative;
+}
+
 .ai-model-selector {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
   cursor: pointer;
+}
+
+.preference-message {
+  position: absolute;
+  top: -35px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  animation: fadeIn 0.2s ease;
+  z-index: 10;
+}
+
+.preference-message.success {
+  background: #4caf50;
+  color: white;
+}
+
+.preference-message.error {
+  background: #f44336;
+  color: white;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .ai-model-selector:hover:not(:disabled) {
