@@ -78,7 +78,7 @@ const developmentConfig: EnvConfig = {
 const productionConfig: EnvConfig = {
   env: 'production',
   // 生产环境地址（部署时需要修改）
-  apiBaseUrl: 'https://118.31.118.176',
+  apiBaseUrl: 'https://shiwu.shop',
   wsBaseUrl: 'wss://shiwu.shop',  // 使用 wss:// 协议，Nginx 会代理转换为 ws://
   wsEndpoints: {
     chat: '/ws/chat',
