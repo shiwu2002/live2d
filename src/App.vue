@@ -464,7 +464,10 @@ const selectDefaultModel = (models: ModelConfig[]) => {
   } else if (models.length > 0) {
     // 按优先级排序，选择优先级最高的
     const sorted = [...models].sort((a, b) => a.priority - b.priority)
-    selectedAiModel.value = sorted[0].fullIdentifier
+        const firstModel = sorted[0]
+    if (firstModel) {
+      selectedAiModel.value = firstModel.fullIdentifier
+    }
   }
 }
 

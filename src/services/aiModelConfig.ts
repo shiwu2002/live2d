@@ -414,13 +414,16 @@ export class AiModelConfigService {
         const protocolsMap = result.data.protocols
         return Object.keys(protocolsMap).map(protocolType => {
           const info = protocolsMap[protocolType]
+          if (!info) {
+            return null
+          }
           return {
             protocolType,
             description: info.description || '',
             healthy: info.healthy,
             model: info.model
           }
-        })
+        }).filter((item): item is NonNullable<typeof item> => item !== null)
       } else {
         console.error('获取协议健康状态失败:', result.message)
         return []
