@@ -96,6 +96,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { VoiceCallManager, type VoiceCallState } from '../services/voiceCallManager'
+import type { Live2DAnimationCommand } from '../types/live2d'
 
 // Props
 interface Props {
@@ -111,6 +112,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
   (e: 'close'): void
+  (e: 'animation', command: Live2DAnimationCommand): void
 }>()
 
 // 状态
@@ -183,6 +185,10 @@ const initVoiceCallManager = () => {
   voiceCallManager.value.onAiReply((text, isFinal) => {
     aiReplyText.value = text
     aiReplyFinal.value = isFinal
+  })
+
+  voiceCallManager.value.onAnimation((command) => {
+    emit('animation', command)
   })
 }
 

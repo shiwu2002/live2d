@@ -10,6 +10,7 @@
       :visible="showChat"
       @update:visible="showChat = $event"
       @close="showChat = false"
+      @animation="handleAnimation"
     />
 
     <!-- 语音通话窗口 -->
@@ -20,6 +21,7 @@
       :openid="wsConfig.openid"
       :ai-session-id="wsConfig.aiSessionId"
       @close="showVoiceCall = false"
+      @animation="handleAnimation"
     />
 
 
@@ -82,8 +84,10 @@
       <div class="widget-body" v-show="isWidgetVisible">
         <Live2DModel
           v-if="modelPath"
+          ref="live2dModelRef"
           :key="currentModel"
           :modelPath="modelPath"
+          :modelId="currentModel"
           :width="widgetWidth"
           :height="widgetHeight"
         />
@@ -151,6 +155,7 @@ import { autoModelConfig, getAutoModelIds } from './config/auto-models'
 import { getChatConfig, generateSessionId } from './config'
 import { getWebSocketUrl, logEnvConfig } from './config'
 import type { UserLoginInfo, UserInfo } from './types/login'
+import type { Live2DAnimationCommand } from './types/live2d'
 import { authService } from './services/authService'
 import { aiModelConfigService, aiModelSwitchService, type ModelConfig } from './services/aiModelConfig'
 
@@ -160,6 +165,8 @@ interface ModelInfo {
   name: string
   path: string
 }
+
+const live2dModelRef = ref<InstanceType<typeof Live2DModel> | null>(null)
 
 // 从自动生成的配置中获取模型列表
 const discoveredModels = computed<ModelInfo[]>(() => {
@@ -304,14 +311,17 @@ const toggleWidget = () => {
 
 // 播放随机动作
 const playRandomMotion = () => {
-  console.log('播放随机动作')
-  // 这里可以添加触发Live2D模型动作的逻辑
+  live2dModelRef.value?.playRandomMotion()
 }
 
 // 切换表情
 const changeExpression = () => {
-  console.log('切换表情')
-  // 这里可以添加切换Live2D模型表情的逻辑
+  live2dModelRef.value?.playRandomExpression()
+}
+
+// 处理动画指令（来自 AI 消息的 animation 字段）
+const handleAnimation = (command: Live2DAnimationCommand) => {
+  live2dModelRef.value?.executeAnimation(command)
 }
 
 // 动作/表情下拉框选中的值

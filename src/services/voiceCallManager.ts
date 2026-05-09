@@ -7,6 +7,7 @@
 import { WebSocketService, type WebSocketConfig } from './websocket'
 import { AudioRecorder } from './audioRecorder'
 import { AudioPlayer } from './audioPlayer'
+import type { Live2DAnimationCommand } from '../types/live2d'
 
 export type VoiceCallState = 'idle' | 'connecting' | 'connected' | 'talking' | 'listening' | 'error'
 
@@ -26,6 +27,7 @@ export class VoiceCallManager {
   private errorCallbacks: Set<(error: Error) => void> = new Set()
   private recognitionCallbacks: Set<(text: string) => void> = new Set()
   private aiReplyCallbacks: Set<(text: string, isFinal: boolean) => void> = new Set()
+  private animationCallbacks: Set<(command: Live2DAnimationCommand) => void> = new Set()
   
   // 流式AI回复累积缓冲区
   private aiReplyBuffer = ''
@@ -61,6 +63,10 @@ export class VoiceCallManager {
   private setupWebSocketListeners(): void {
     // 监听消息
     this.wsService.onMessage((message) => {
+      if (message.animation) {
+        this.notifyAnimation(message.animation)
+      }
+
       if (message.type === 'AUDIO') {
         // 接收到TTS音频数据（MP3格式），播放
         if (message.content instanceof ArrayBuffer) {
@@ -428,6 +434,16 @@ export class VoiceCallManager {
     })
   }
 
+  private notifyAnimation(command: Live2DAnimationCommand): void {
+    this.animationCallbacks.forEach(callback => {
+      try {
+        callback(command)
+      } catch (error) {
+        console.error('动画回调执行失败:', error)
+      }
+    })
+  }
+
   /**
    * 订阅状态变化
    */
@@ -459,6 +475,11 @@ export class VoiceCallManager {
   onAiReply(callback: (text: string, isFinal: boolean) => void): () => void {
     this.aiReplyCallbacks.add(callback)
     return () => this.aiReplyCallbacks.delete(callback)
+  }
+
+  onAnimation(callback: (command: Live2DAnimationCommand) => void): () => void {
+    this.animationCallbacks.add(callback)
+    return () => this.animationCallbacks.delete(callback)
   }
 
   /**
@@ -499,5 +520,6 @@ export class VoiceCallManager {
     this.errorCallbacks.clear()
     this.recognitionCallbacks.clear()
     this.aiReplyCallbacks.clear()
+    this.animationCallbacks.clear()
   }
 }

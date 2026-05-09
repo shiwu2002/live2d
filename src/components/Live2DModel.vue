@@ -8,10 +8,13 @@ import { Application } from '@pixi/app'
 import { Ticker, TickerPlugin } from '@pixi/ticker'
 import { extensions } from '@pixi/extensions'
 import type { Live2DModel as Live2DModelType } from 'pixi-live2d-display/cubism4'
+import type { Live2DAnimationCommand, Live2DAnimationInfo, Live2DEmotion } from '../types/live2d'
+import { resolveAnimation } from '../config/emotionMap'
 
 
 const props = defineProps<{
   modelPath: string
+  modelId?: string
   width?: number
   height?: number
   x?: number
@@ -263,6 +266,116 @@ watch(() => props.modelPath, async () => {
     model.destroy()
     await loadModel()
   }
+})
+
+const playMotion = (group: string, index = 0) => {
+  if (!model) {
+    console.warn('Live2D 模型未加载，无法播放动作')
+    return
+  }
+  try {
+    model.motion(group, index)
+    console.log(`播放动作: ${group}[${index}]`)
+  } catch (e) {
+    console.warn(`播放动作失败: ${group}[${index}]`, e)
+  }
+}
+
+const playExpression = (name: string) => {
+  if (!model) {
+    console.warn('Live2D 模型未加载，无法播放表情')
+    return
+  }
+  try {
+    model.expression(name)
+    console.log(`播放表情: ${name}`)
+  } catch (e) {
+    console.warn(`播放表情失败: ${name}`, e)
+  }
+}
+
+const executeAnimation = (command: Live2DAnimationCommand) => {
+  const resolved = command.emotion && props.modelId
+    ? resolveAnimation(props.modelId, command)
+    : command
+
+  if (!resolved) return
+
+  if (resolved.expression) {
+    playExpression(resolved.expression.name)
+  }
+  if (resolved.motion) {
+    playMotion(resolved.motion.group, resolved.motion.index ?? 0)
+  }
+}
+
+const executeEmotion = (emotion: Live2DEmotion) => {
+  if (!props.modelId) {
+    console.warn('未提供 modelId，无法解析情绪标签')
+    return
+  }
+  const resolved = resolveAnimation(props.modelId, { emotion })
+  if (resolved) {
+    executeAnimation(resolved)
+  }
+}
+
+const getAnimationInfo = (): Live2DAnimationInfo => {
+  if (!model?.internalModel) {
+    return { motionGroups: [], expressions: [] }
+  }
+
+  const motionGroups: string[] = []
+  const expressions: string[] = []
+
+  try {
+    const motionManager = (model.internalModel as any).motionManager
+    if (motionManager?.motionGroups) {
+      Object.keys(motionManager.motionGroups).forEach(key => {
+        motionGroups.push(key)
+      })
+    }
+
+    const settings = (model.internalModel as any).settings
+    if (settings?.expressions) {
+      settings.expressions.forEach((exp: any) => {
+        const rawName: string | undefined = exp.Name || exp.name || exp.File || exp.file
+        if (rawName) {
+          expressions.push(rawName.replace(/\.exp3\.json$/i, ''))
+        }
+      })
+    }
+  } catch (e) {
+    console.warn('获取模型动画信息失败:', e)
+  }
+
+  return { motionGroups, expressions }
+}
+
+const playRandomMotion = () => {
+  const info = getAnimationInfo()
+  if (info.motionGroups.length === 0) return
+  const nonIdleGroups = info.motionGroups.filter(g => g.toLowerCase() !== 'idle')
+  const groups = nonIdleGroups.length > 0 ? nonIdleGroups : info.motionGroups
+  const group = groups[Math.floor(Math.random() * groups.length)]!
+  playMotion(group, 0)
+}
+
+const playRandomExpression = () => {
+  const info = getAnimationInfo()
+  if (info.expressions.length === 0) return
+  const name = info.expressions[Math.floor(Math.random() * info.expressions.length)]!
+  playExpression(name)
+}
+
+defineExpose({
+  playMotion,
+  playExpression,
+  executeAnimation,
+  executeEmotion,
+  getAnimationInfo,
+  playRandomMotion,
+  playRandomExpression,
 })
 </script>
 

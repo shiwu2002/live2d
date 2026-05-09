@@ -165,6 +165,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { WebSocketService, type WebSocketConfig } from '../services/websocket'
 import type { ExtendedChatMessage } from '../types/chat'
+import type { Live2DAnimationCommand } from '../types/live2d'
 import { AudioRecorder, AudioPlayer, AudioUtils } from '../services/audio'
 import { 
   getTextContent, 
@@ -191,6 +192,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'update:visible', value: boolean): void
+  (e: 'animation', command: Live2DAnimationCommand): void
 }>()
 
 // WebSocket 和音频服务
@@ -323,6 +325,10 @@ const initializeServices = async () => {
  */
 const handleMessage = (message: ExtendedChatMessage) => {
   messages.value.push(message)
+  
+  if (message.animation) {
+    emit('animation', message.animation)
+  }
   
   // 如果是语音通话模式的音频消息，自动播放
   if (props.mode === 'voice' && message.type === 'AUDIO' && message.sender === 'ai') {
