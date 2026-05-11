@@ -6,6 +6,7 @@
       :ws-url="wsConfig.baseUrl"
       :openid="wsConfig.openid"
       :ai-session-id="wsConfig.aiSessionId"
+      :token="currentToken"
       :mode="wsConfig.mode"
       :visible="showChat"
       @update:visible="showChat = $event"
@@ -20,6 +21,7 @@
       :ws-url="voiceWsUrl"
       :openid="wsConfig.openid"
       :ai-session-id="wsConfig.aiSessionId"
+      :token="currentToken"
       @close="showVoiceCall = false"
       @animation="handleAnimation"
     />
@@ -294,6 +296,8 @@ const wsConfig = ref(getChatConfig({
 
 // 获取其他WebSocket服务的URL
 const voiceWsUrl = getWebSocketUrl('voice')
+
+const currentToken = computed(() => authService.getToken())
 
 // 监听模型变化并输出日志
 watch(currentModel, (newModel, oldModel) => {

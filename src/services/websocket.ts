@@ -79,7 +79,8 @@ export interface WebSocketConfig {
   baseUrl: string
   openid?: string
   aiSessionId?: string
-  mode: 'text' | 'voice' // 文本聊天或语音通话
+  token?: string
+  mode: 'text' | 'voice'
 }
 
 export class WebSocketService {
@@ -102,21 +103,21 @@ export class WebSocketService {
    * 获取完整的 WebSocket URL
    */
   private getWebSocketUrl(): string {
-    const { baseUrl, openid, aiSessionId, mode } = this.config
+    const { baseUrl, openid, aiSessionId, token, mode } = this.config
     
-    // 根据模式选择端点
     const endpoint = mode === 'voice' ? '/ws/voice' : '/ws/chat'
     
-    // 检查baseUrl是否已经包含端点路径，避免重复
     let url = baseUrl.endsWith(endpoint) ? baseUrl : `${baseUrl}${endpoint}`
     
-    // 添加认证参数
     const params = new URLSearchParams()
     if (openid) {
       params.append('openid', openid)
     }
     if (aiSessionId) {
       params.append('aiSessionId', aiSessionId)
+    }
+    if (token) {
+      params.append('token', token)
     }
     
     if (params.toString()) {

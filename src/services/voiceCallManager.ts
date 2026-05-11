@@ -15,6 +15,7 @@ export interface VoiceCallManagerConfig {
   wsBaseUrl: string
   openid?: string
   aiSessionId?: string
+  token?: string
   autoReconnect?: boolean
 }
 
@@ -39,6 +40,7 @@ export class VoiceCallManager {
       baseUrl: config.wsBaseUrl,
       openid: config.openid,
       aiSessionId: config.aiSessionId,
+      token: config.token,
       mode: 'voice'
     }
     this.wsService = new WebSocketService(wsConfig)

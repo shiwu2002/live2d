@@ -104,6 +104,7 @@ interface Props {
   wsUrl: string
   openid?: string
   aiSessionId?: string
+  token?: string
 }
 
 const props = defineProps<Props>()
@@ -157,7 +158,8 @@ const initVoiceCallManager = () => {
   voiceCallManager.value = new VoiceCallManager({
     wsBaseUrl: props.wsUrl,
     openid: props.openid,
-    aiSessionId: props.aiSessionId
+    aiSessionId: props.aiSessionId,
+    token: props.token
   })
 
   // 设置初始音量

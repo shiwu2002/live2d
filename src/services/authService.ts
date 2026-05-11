@@ -17,8 +17,18 @@ export class AuthService {
   private baseUrl: string
 
   constructor(baseUrl?: string) {
-    // 优先使用传入的baseUrl，否则从配置文件读取
     this.baseUrl = baseUrl || getApiBaseUrl()
+  }
+
+  private getHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    }
+    const token = this.getToken()
+    if (token) {
+      headers['Authorization'] = token
+    }
+    return headers
   }
 
   /**
@@ -53,9 +63,7 @@ export class AuthService {
 
       const response = await fetch(`${this.baseUrl}/auth/register`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
+        headers: this.getHeaders(),
         body: formData.toString()
       })
 
@@ -94,9 +102,7 @@ export class AuthService {
   
       const response = await fetch(`${this.baseUrl}/auth/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
+        headers: this.getHeaders(),
         body: formData.toString()
       })
   
@@ -136,12 +142,6 @@ export class AuthService {
    */
   async changePassword(data: ChangePasswordRequest): Promise<ApiResponse<string>> {
     try {
-      const token = this.getToken()
-      if (!token) {
-        throw new Error('请先登录')
-      }
-
-      // 验证参数
       if (!data.oldPassword || !data.newPassword) {
         throw new Error('旧密码和新密码不能为空')
       }
@@ -157,10 +157,7 @@ export class AuthService {
 
       const response = await fetch(`${this.baseUrl}/auth/changePassword`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': token
-        },
+        headers: this.getHeaders(),
         body: formData.toString()
       })
 
@@ -238,9 +235,7 @@ export class AuthService {
 
       const response = await fetch(`${this.baseUrl}/auth/sendEmailCode`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
+        headers: this.getHeaders(),
         body: formData.toString()
       })
 
@@ -269,9 +264,7 @@ export class AuthService {
 
       const response = await fetch(`${this.baseUrl}/auth/sendResetEmailCode`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
+        headers: this.getHeaders(),
         body: formData.toString()
       })
 
@@ -310,9 +303,7 @@ export class AuthService {
 
       const response = await fetch(`${this.baseUrl}/auth/resetPasswordByEmail`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
+        headers: this.getHeaders(),
         body: formData.toString()
       })
 

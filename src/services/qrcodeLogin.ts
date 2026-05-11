@@ -40,9 +40,17 @@ export class QRCodeLoginService {
   private onWSDisconnected?: () => void
 
   private wsUrl: string
+  private token?: string
 
-  constructor(wsUrl: string) {
+  constructor(wsUrl: string, token?: string) {
     this.wsUrl = wsUrl
+    this.token = token
+  }
+
+  private getFullWsUrl(): string {
+    if (!this.token) return this.wsUrl
+    const separator = this.wsUrl.includes('?') ? '&' : '?'
+    return `${this.wsUrl}${separator}token=${encodeURIComponent(this.token)}`
   }
 
   /**
@@ -51,7 +59,7 @@ export class QRCodeLoginService {
   async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        this.ws = new WebSocket(this.wsUrl)
+        this.ws = new WebSocket(this.getFullWsUrl())
 
         this.ws.onopen = () => {
           console.log('二维码登录WebSocket已连接')
@@ -347,6 +355,6 @@ export class QRCodeLoginService {
 /**
  * 创建二维码登录服务实例
  */
-export function createQRCodeLoginService(wsUrl: string): QRCodeLoginService {
-  return new QRCodeLoginService(wsUrl)
+export function createQRCodeLoginService(wsUrl: string, token?: string): QRCodeLoginService {
+  return new QRCodeLoginService(wsUrl, token)
 }

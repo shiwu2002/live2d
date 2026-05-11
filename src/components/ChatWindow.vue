@@ -182,6 +182,7 @@ const props = withDefaults(defineProps<{
   wsUrl: string
   openid?: string
   aiSessionId?: string
+  token?: string
   mode?: 'text' | 'voice'
   visible?: boolean
 }>(), {
@@ -293,6 +294,7 @@ const initializeServices = async () => {
       baseUrl: props.wsUrl,
       openid: props.openid,
       aiSessionId: props.aiSessionId,
+      token: props.token,
       mode: props.mode
     }
 
