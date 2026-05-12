@@ -1,0 +1,25 @@
+{
+	"Type": "Live2D Expression",
+	"Parameters": [
+		{
+			"Id": "PARAM_EYE_L_OPEN",
+			"Value": 0.7,
+			"Blend": "Overwrite"
+		},
+		{
+			"Id": "PARAM_EYE_R_OPEN",
+			"Value": 0.7,
+			"Blend": "Overwrite"
+		},
+		{
+			"Id": "PARAM_BROW_FORM",
+			"Value": 0.5,
+			"Blend": "Overwrite"
+		},
+		{
+			"Id": "PARAM_MOUTH_FORM",
+			"Value": 1,
+			"Blend": "Overwrite"
+		}
+	]
+}

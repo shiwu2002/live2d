@@ -1,0 +1,38 @@
+{
+	"Version": 3,
+	"Meta": {
+		"Duration": 2.5,
+		"Fps": 30.0,
+		"FadeInTime": 0.2,
+		"FadeOutTime": 0.3,
+		"Loop": false,
+		"AreBeziersRestricted": true,
+		"CurveCount": 4,
+		"TotalSegmentCount": 8,
+		"TotalPointCount": 16,
+		"UserDataCount": 0,
+		"TotalUserDataSize": 0
+	},
+	"Curves": [
+		{
+			"Target": "Parameter",
+			"Id": "PARAM_ARM_R_A",
+			"Segments": [0, 0, 1, 0.2, 5, 0.4, 28, 0.6, 28, 1, 0.8, 20, 1.0, 28, 1.2, 28, 1, 1.4, 20, 1.6, 28, 1.8, 28, 1, 2.0, 20, 2.2, 0, 2.5, 0]
+		},
+		{
+			"Target": "Parameter",
+			"Id": "PARAM_ARM_R_B",
+			"Segments": [0, 0, 1, 0.2, 0, 0.4, 1, 0.6, 1, 1, 0.8, 1, 1.0, 1, 1.2, 1, 1, 1.4, 1, 1.6, 1, 1.8, 1, 1, 2.0, 0.5, 2.2, 0, 2.5, 0]
+		},
+		{
+			"Target": "Parameter",
+			"Id": "PARAM_HAND_R",
+			"Segments": [0, 0, 1, 0.2, 0, 0.4, 11, 0.6, 11, 1, 0.8, 5, 1.0, 11, 1.2, 11, 1, 1.4, 5, 1.6, 11, 1.8, 11, 1, 2.0, 5, 2.2, 0, 2.5, 0]
+		},
+		{
+			"Target": "Parameter",
+			"Id": "PARAM_ANGLE_Z",
+			"Segments": [0, 0, 1, 0.3, 0, 0.6, -10, 0.9, -10, 1, 1.2, -10, 1.5, -10, 1.8, -10, 1, 2.0, -5, 2.2, 0, 2.5, 0]
+		}
+	]
+}

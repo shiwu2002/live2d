@@ -12,6 +12,28 @@
 			"Gantzert_Felixander.2048/texture_06.png"
 		],
 		"DisplayInfo": "Gantzert_Felixander.cdi3.json",
+		"Expressions": [
+			{
+				"Name": "Smile.exp3.json",
+				"File": "expressions/Smile.exp3.json"
+			},
+			{
+				"Name": "Angry.exp3.json",
+				"File": "expressions/Angry.exp3.json"
+			},
+			{
+				"Name": "Sad.exp3.json",
+				"File": "expressions/Sad.exp3.json"
+			},
+			{
+				"Name": "Surprised.exp3.json",
+				"File": "expressions/Surprised.exp3.json"
+			},
+			{
+				"Name": "Shy.exp3.json",
+				"File": "expressions/Shy.exp3.json"
+			}
+		],
 		"Motions": {
 			"Idle": [
 				{
@@ -37,6 +59,16 @@
 			"FlickRight": [
 				{
 					"File": "motion/A_05.motion3.json"
+				}
+			],
+			"Greeting": [
+				{
+					"File": "motion/Greeting.motion3.json"
+				}
+			],
+			"Waving": [
+				{
+					"File": "motion/Waving.motion3.json"
 				}
 			]
 		}

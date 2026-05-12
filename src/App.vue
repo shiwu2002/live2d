@@ -10,6 +10,7 @@
       :visible="showChat"
       @update:visible="showChat = $event"
       @close="showChat = false"
+      @animation="handleAnimation"
     />
 
     <!-- 语音通话窗口 -->
@@ -20,6 +21,7 @@
       :openid="wsConfig.openid"
       :ai-session-id="wsConfig.aiSessionId"
       @close="showVoiceCall = false"
+      @animation="handleAnimation"
     />
 
 
@@ -29,6 +31,14 @@
       @close="showUserAuthModal = false"
       @login-success="handleUserAuthLoginSuccess"
       @register-success="handleUserAuthRegisterSuccess"
+    />
+
+    <!-- 角色设置窗口 -->
+    <CharacterSettings
+      :visible="showCharacterSettings"
+      :userId="currentUser?.openid || ''"
+      @close="showCharacterSettings = false"
+      @saved="handleCharacterSaved"
     />
 
     <!-- 固定的 Live2D 小窗口 -->
@@ -64,6 +74,9 @@
           <button class="control-btn" @click="toggleVoiceCall" title="语音通话">
             <span>🎤</span>
           </button>
+          <button class="control-btn" @click="toggleCharacterSettings" title="角色设置" :style="!isLoggedIn ? 'opacity:0.4' : ''">
+            <span>🎭</span>
+          </button>
           <select class="control-select" @change="handleActionSelect" v-model="selectedAction" title="动作/表情">
             <option value="">🎭</option>
             <option value="motion">🎭 随机动作</option>
@@ -82,8 +95,10 @@
       <div class="widget-body" v-show="isWidgetVisible">
         <Live2DModel
           v-if="modelPath"
+          ref="live2dModelRef"
           :key="currentModel"
           :modelPath="modelPath"
+          :modelId="currentModel"
           :width="widgetWidth"
           :height="widgetHeight"
         />
@@ -147,10 +162,12 @@ import Live2DModel from './components/Live2DModel.vue'
 import ChatWindow from './components/ChatWindow.vue'
 import VoiceCall from './components/VoiceCall.vue'
 import UserAuthModal from './components/UserAuthModal.vue'
+import CharacterSettings from './components/CharacterSettings.vue'
 import { autoModelConfig, getAutoModelIds } from './config/auto-models'
 import { getChatConfig, generateSessionId } from './config'
 import { getWebSocketUrl, logEnvConfig } from './config'
 import type { UserLoginInfo, UserInfo } from './types/login'
+import type { Live2DAnimationCommand } from './types/live2d'
 import { authService } from './services/authService'
 import { aiModelConfigService, aiModelSwitchService, type ModelConfig } from './services/aiModelConfig'
 
@@ -160,6 +177,8 @@ interface ModelInfo {
   name: string
   path: string
 }
+
+const live2dModelRef = ref<InstanceType<typeof Live2DModel> | null>(null)
 
 // 从自动生成的配置中获取模型列表
 const discoveredModels = computed<ModelInfo[]>(() => {
@@ -257,6 +276,9 @@ const showVoiceCall = ref(false)
 // 用户名密码登录窗口状态
 const showUserAuthModal = ref(false)
 
+// 角色设置窗口状态
+const showCharacterSettings = ref(false)
+
 // 用户登录状态
 const isLoggedIn = ref(false)
 const currentUser = ref<UserLoginInfo | null>(null)
@@ -304,14 +326,17 @@ const toggleWidget = () => {
 
 // 播放随机动作
 const playRandomMotion = () => {
-  console.log('播放随机动作')
-  // 这里可以添加触发Live2D模型动作的逻辑
+  live2dModelRef.value?.playRandomMotion()
 }
 
 // 切换表情
 const changeExpression = () => {
-  console.log('切换表情')
-  // 这里可以添加切换Live2D模型表情的逻辑
+  live2dModelRef.value?.playRandomExpression()
+}
+
+// 处理动画指令（来自 AI 消息的 animation 字段）
+const handleAnimation = (command: Live2DAnimationCommand) => {
+  live2dModelRef.value?.executeAnimation(command)
 }
 
 // 动作/表情下拉框选中的值
@@ -345,6 +370,21 @@ const toggleVoiceCall = () => {
 const toggleUserAuthModal = () => {
   showUserAuthModal.value = !showUserAuthModal.value
   console.log(`用户名密码登录窗口: ${showUserAuthModal.value ? '打开' : '关闭'}`)
+}
+
+// 切换角色设置窗口
+const toggleCharacterSettings = () => {
+  if (!isLoggedIn.value) {
+    showMessage('请先登录', 'error')
+    return
+  }
+  showCharacterSettings.value = !showCharacterSettings.value
+}
+
+// 角色保存成功回调
+const handleCharacterSaved = (character: any) => {
+  console.log('角色设置已保存:', character)
+  showMessage('角色设置已保存', 'success')
 }
 
 

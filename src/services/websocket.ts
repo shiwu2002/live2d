@@ -3,7 +3,8 @@
  * 适配后端协议：支持文本聊天和语音通话两种模式
  */
 
-// 消息类型（后端协议使用大写）
+import type { Live2DAnimationCommand } from '../types/live2d'
+
 export type MessageType = 'TEXT' | 'AUDIO' | 'CONTROL' | 'ERROR' | 'PING' | 'PONG' | 'IMAGES'
 
 // 控制命令类型
@@ -27,6 +28,7 @@ export interface BaseMessage {
   sender?: 'user' | 'system' | 'ai'
   timestamp?: number
   id?: string
+  animation?: Live2DAnimationCommand
 }
 
 // 文本消息
@@ -235,7 +237,8 @@ export class WebSocketService {
             content: parsed.content,
             sender: parsed.sender || 'ai',
             timestamp: parsed.timestamp || Date.now(),
-            id: parsed.id || this.generateId()
+            id: parsed.id || this.generateId(),
+            animation: parsed.animation || undefined,
           }
           
           this.notifyMessage(message)

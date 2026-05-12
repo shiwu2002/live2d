@@ -21,6 +21,12 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
         rewrite: (path) => path
+      },
+      // 代理文件上传接口
+      '/file': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        rewrite: (path) => path
       }
     }
   },
