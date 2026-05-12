@@ -179,7 +179,7 @@ const uploadedAudioUrl = ref('')
 const form = ref<CharacterInfoDto>({
   userId: '',
   name: '',
-  gender: '',
+  gender: undefined,
   description: '',
   background: '',
   personalityTraits: '',
@@ -204,7 +204,7 @@ const loadCharacter = async () => {
       form.value = {
         userId: c.userId,
         name: c.name || '',
-        gender: c.gender || '',
+        gender: c.gender || undefined,
         description: c.description || '',
         background: c.background || '',
         personalityTraits: c.personalityTraits || '',
@@ -250,6 +250,7 @@ const handleImageUpload = async (event: Event) => {
   try {
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
+      if (!file) continue
       if (file.size > 10 * 1024 * 1024) {
         showMessage(`${file.name} 超过 10MB 限制`, 'error')
         continue
