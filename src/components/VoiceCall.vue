@@ -311,7 +311,7 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%);
+  background: linear-gradient(135deg, rgba(255, 107, 157, 0.95) 0%, rgba(196, 69, 105, 0.95) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -423,7 +423,7 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  border: 3px solid rgba(102, 126, 234, 0.4);
+  border: 3px solid rgba(255, 107, 157, 0.4);
   animation: rippleAnimation 2s ease-out infinite;
 }
 
@@ -454,11 +454,11 @@ onUnmounted(() => {
   width: 160px;
   height: 160px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 15px 40px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 15px 40px rgba(255, 107, 157, 0.4);
   transition: all 0.4s ease;
 }
 
@@ -473,21 +473,21 @@ onUnmounted(() => {
 }
 
 .state-connecting .avatar-circle {
-  background: linear-gradient(135deg, #ffd54f 0%, #ffb300 100%);
+  background: linear-gradient(135deg, #FFD54F 0%, #FFB300 100%);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
 .state-connected .avatar-circle {
-  background: linear-gradient(135deg, #81c784 0%, #66bb6a 100%);
+  background: linear-gradient(135deg, #FF8A9E 0%, #FF6B9D 100%);
 }
 
 .state-talking .avatar-circle {
-  background: linear-gradient(135deg, #64b5f6 0%, #42a5f5 100%);
+  background: linear-gradient(135deg, #FDA7DF 0%, #FF8A9E 100%);
   animation: pulse 1s ease-in-out infinite;
 }
 
 .state-listening .avatar-circle {
-  background: linear-gradient(135deg, #ffb74d 0%, #ffa726 100%);
+  background: linear-gradient(135deg, #FFB74D 0%, #FFA726 100%);
   animation: pulse 1s ease-in-out infinite;
 }
 
@@ -498,11 +498,11 @@ onUnmounted(() => {
 @keyframes pulse {
   0%, 100% {
     transform: scale(1);
-    box-shadow: 0 15px 40px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 15px 40px rgba(255, 107, 157, 0.4);
   }
   50% {
     transform: scale(1.05);
-    box-shadow: 0 20px 50px rgba(102, 126, 234, 0.6);
+    box-shadow: 0 20px 50px rgba(255, 107, 157, 0.6);
   }
 }
 
@@ -527,7 +527,7 @@ onUnmounted(() => {
 .call-duration {
   font-size: 20px;
   font-weight: 600;
-  color: #667eea;
+  color: #FF6B9D;
   font-variant-numeric: tabular-nums;
   letter-spacing: 2px;
 }
@@ -640,7 +640,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   padding: 16px;
-  background: rgba(102, 126, 234, 0.08);
+  background: rgba(255, 107, 157, 0.08);
   border-radius: 16px;
 }
 
@@ -655,7 +655,7 @@ onUnmounted(() => {
   border-radius: 3px;
   outline: none;
   -webkit-appearance: none;
-  background: linear-gradient(to right, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%);
+  background: linear-gradient(to right, rgba(255, 107, 157, 0.3) 0%, rgba(196, 69, 105, 0.3) 100%);
   position: relative;
 }
 
@@ -664,23 +664,23 @@ onUnmounted(() => {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+  background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
+  box-shadow: 0 2px 8px rgba(255, 107, 157, 0.4);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .volume-slider::-webkit-slider-thumb:hover {
   transform: scale(1.2);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.6);
+  box-shadow: 0 4px 12px rgba(255, 107, 157, 0.6);
 }
 
 .volume-slider::-moz-range-thumb {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+  background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
+  box-shadow: 0 2px 8px rgba(255, 107, 157, 0.4);
   cursor: pointer;
   border: none;
   transition: all 0.2s;
@@ -688,12 +688,12 @@ onUnmounted(() => {
 
 .volume-slider::-moz-range-thumb:hover {
   transform: scale(1.2);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.6);
+  box-shadow: 0 4px 12px rgba(255, 107, 157, 0.6);
 }
 
 .volume-value {
   font-size: 14px;
-  color: #667eea;
+  color: #FF6B9D;
   font-weight: 600;
   min-width: 32px;
   text-align: right;
@@ -704,8 +704,8 @@ onUnmounted(() => {
    ============================================ */
 .call-controls {
   padding: 24px;
-  background: rgba(102, 126, 234, 0.05);
-  border-top: 1px solid rgba(102, 126, 234, 0.1);
+  background: rgba(255, 107, 157, 0.05);
+  border-top: 1px solid rgba(255, 107, 157, 0.1);
 }
 
 .control-row {
@@ -772,7 +772,7 @@ onUnmounted(() => {
 
 /* 呼叫按钮 */
 .control-btn-call {
-  background: linear-gradient(135deg, #4caf50 0%, #66bb6a 100%);
+  background: linear-gradient(135deg, #FF8A9E 0%, #FF6B9D 100%);
   width: 80px;
   height: 80px;
 }
@@ -783,17 +783,15 @@ onUnmounted(() => {
 
 /* 次要按钮 */
 .control-btn-secondary {
-  background: linear-gradient(135deg, #78909c 0%, #90a4ae 100%);
+  background: linear-gradient(135deg, #FDA7DF 0%, #FF8A9E 100%);
 }
 
-/* 打断按钮 */
 .control-btn-interrupt {
-  background: linear-gradient(135deg, #ffa726 0%, #ffb74d 100%);
+  background: linear-gradient(135deg, #FFA726 0%, #FFB74D 100%);
 }
 
-/* 挂断按钮 */
 .control-btn-end {
-  background: linear-gradient(135deg, #ef5350 0%, #e57373 100%);
+  background: linear-gradient(135deg, #E84393 0%, #C44569 100%);
   width: 80px;
   height: 80px;
 }

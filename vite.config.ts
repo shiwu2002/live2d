@@ -1,28 +1,37 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-// https://vite.dev/config/
+const host = process.env.TAURI_DEV_HOST
+
 export default defineConfig({
   plugins: [vue()],
-  base: '/live2d/',
-  
-  // 开发服务器配置
+  base: process.env.TAURI_ENV_PLATFORM ? './' : '/live2d/',
+
   server: {
     port: 5173,
+    strictPort: true,
+    host: host || false,
+    hmr: host
+      ? {
+          protocol: 'ws',
+          host,
+          port: 5174,
+        }
+      : undefined,
+    watch: {
+      ignored: ['**/src-tauri/**'],
+    },
     proxy: {
-      // 代理 API 请求到后端服务器，解决 CORS 问题
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
         rewrite: (path) => path
       },
-      // 代理认证接口
       '/auth': {
         target: 'http://localhost:8080',
         changeOrigin: true,
         rewrite: (path) => path
       },
-      // 代理文件上传接口
       '/file': {
         target: 'http://localhost:8080',
         changeOrigin: true,
@@ -30,15 +39,14 @@ export default defineConfig({
       }
     }
   },
-  
+
   build: {
-    target: 'es2020',
+    target: process.env.TAURI_ENV_PLATFORM ? 'chrome105' : 'es2020',
     sourcemap: false,
     minify: 'esbuild',
     chunkSizeWarningLimit: 2000,
     rollupOptions: {
       output: {
-        // 手动拆分较大的依赖，降低首屏包体积并提升缓存命中
         manualChunks(id) {
           if (id.includes('node_modules')) {
             if (id.includes('@pixi/')) return 'pixi'

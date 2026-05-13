@@ -751,15 +751,15 @@ const handleClose = () => {
 }
 
 .auth-modal {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 20px;
+  background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
+  border-radius: 24px;
   padding: 40px;
   width: 90%;
   max-width: 450px;
   max-height: 90vh;
   overflow-y: auto;
   position: relative;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 20px 60px rgba(255, 107, 157, 0.3);
   animation: slideUp 0.3s ease;
 }
 
@@ -858,9 +858,9 @@ const handleClose = () => {
 .submit-btn {
   padding: 14px;
   background: white;
-  color: #667eea;
+  color: #FF6B9D;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   font-size: 16px;
   font-weight: bold;
   cursor: pointer;

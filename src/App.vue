@@ -1,6 +1,5 @@
 <template>
-  <div class="app-container">
-    <!-- 聊天窗口 -->
+  <div class="app-container" :class="{ 'desktop-pet': isTauri }">
     <ChatWindow
       v-if="showChat"
       :ws-url="wsConfig.baseUrl"
@@ -13,7 +12,6 @@
       @animation="handleAnimation"
     />
 
-    <!-- 语音通话窗口 -->
     <VoiceCall
       v-if="showVoiceCall"
       :visible="showVoiceCall"
@@ -24,8 +22,6 @@
       @animation="handleAnimation"
     />
 
-
-    <!-- 用户名密码登录注册窗口 -->
     <UserAuthModal
       :visible="showUserAuthModal"
       @close="showUserAuthModal = false"
@@ -33,7 +29,6 @@
       @register-success="handleUserAuthRegisterSuccess"
     />
 
-    <!-- 角色设置窗口 -->
     <CharacterSettings
       :visible="showCharacterSettings"
       :userId="currentUser?.openid || ''"
@@ -41,22 +36,30 @@
       @saved="handleCharacterSaved"
     />
 
-    <!-- 固定的 Live2D 小窗口 -->
-    <div class="live2d-widget" v-if="discoveredModels.length > 0" :style="widgetStyle">
-      <div class="widget-header" @mousedown="startWidgetDrag">
-        <span class="widget-title">{{ currentModelName }}</span>
-        <button class="close-btn" @click="toggleWidget" :title="isWidgetVisible ? '隐藏' : '显示'">
-          {{ isWidgetVisible ? '−' : '+' }}
-        </button>
+    <div v-if="discoveredModels.length > 0" class="pet-container" :class="{ 'desktop-pet': isTauri }">
+      <div
+        class="pet-model-area"
+        :class="{ 'desktop-pet': isTauri }"
+        @mousedown="isTauri ? startTauriDrag($event) : startWidgetDrag($event)"
+      >
+        <Live2DModel
+          v-if="modelPath"
+          ref="live2dModelRef"
+          :key="currentModel"
+          :modelPath="modelPath"
+          :modelId="currentModel"
+          :width="widgetWidth"
+          :height="widgetHeight"
+        />
       </div>
-      
-      <div class="widget-toolbar" v-show="isWidgetVisible">
+
+      <div class="pet-toolbar" :class="{ 'desktop-pet': isTauri }">
         <div class="toolbar-buttons">
           <button
             v-if="!isLoggedIn"
             class="control-btn login-btn"
             @click="toggleUserAuthModal"
-            title="账号密码登录"
+            title="登录"
           >
             <img :src="iconLogin" alt="登录" class="btn-icon" />
           </button>
@@ -66,13 +69,13 @@
             @click="handleLogout"
             :title="`${currentUser?.nickname || '用户'} - 退出登录`"
           >
-            <img :src="iconLogin" alt="退出登录" class="btn-icon" />
+            <img :src="iconLogin" alt="退出" class="btn-icon" />
           </button>
-          <button class="control-btn" @click="toggleChat" title="聊天窗口">
+          <button class="control-btn" @click="toggleChat" title="聊天">
             <img :src="iconChat" alt="聊天" class="btn-icon" />
           </button>
-          <button class="control-btn" @click="toggleVoiceCall" title="语音通话">
-            <img :src="iconVoice" alt="语音通话" class="btn-icon" />
+          <button class="control-btn" @click="toggleVoiceCall" title="语音">
+            <img :src="iconVoice" alt="语音" class="btn-icon" />
           </button>
 
           <div class="more-menu-wrapper">
@@ -80,6 +83,32 @@
               <img :src="iconMore" alt="更多" class="btn-icon" />
             </button>
             <div class="more-dropdown" v-show="showMoreMenu">
+              <div class="dropdown-section-label">模型</div>
+              <div class="dropdown-select-wrapper">
+                <select v-model="currentModel" class="dropdown-select" title="Live2D 模型">
+                  <option v-for="model in discoveredModels" :key="model.id" :value="model.id">
+                    {{ model.name }}
+                  </option>
+                </select>
+              </div>
+              <div class="dropdown-select-wrapper">
+                <select
+                  v-model="selectedAiModel"
+                  class="dropdown-select"
+                  @change="handleAiModelChange"
+                  :disabled="aiModelsLoading || isSavingPreference || !isLoggedIn"
+                  title="AI 模型"
+                >
+                  <option value="" disabled>
+                    {{ aiModelsLoading ? '加载中...' : (isSavingPreference ? '保存中...' : (isLoggedIn ? '选择 AI 模型' : '请先登录')) }}
+                  </option>
+                  <option v-for="model in aiModels" :key="model.fullIdentifier" :value="model.fullIdentifier">
+                    {{ model.protocolName }} - {{ model.modelName }}{{ model.isDefault ? ' ★' : '' }}
+                  </option>
+                </select>
+              </div>
+              <div class="dropdown-divider"></div>
+              <div class="dropdown-section-label">操作</div>
               <button
                 class="dropdown-item"
                 @click="toggleCharacterSettings(); showMoreMenu = false"
@@ -105,13 +134,22 @@
                 <span class="dropdown-emoji">😊</span>
                 <span>随机表情</span>
               </button>
+              <div class="dropdown-divider"></div>
               <button
                 class="dropdown-item"
-                @click="toggleWidget(); showMoreMenu = false"
-                title="隐藏窗口"
+                @click="handleMinimize(); showMoreMenu = false"
+                title="最小化"
               >
-                <img :src="iconHide" alt="隐藏" class="dropdown-icon" />
-                <span>隐藏窗口</span>
+                <span class="dropdown-emoji">➖</span>
+                <span>最小化</span>
+              </button>
+              <button
+                class="dropdown-item"
+                @click="handleQuit(); showMoreMenu = false"
+                title="退出"
+              >
+                <span class="dropdown-emoji">✕</span>
+                <span>退出</span>
               </button>
             </div>
           </div>
@@ -121,54 +159,9 @@
           </div>
         </div>
       </div>
-      
-      <div class="widget-body" v-show="isWidgetVisible">
-        <Live2DModel
-          v-if="modelPath"
-          ref="live2dModelRef"
-          :key="currentModel"
-          :modelPath="modelPath"
-          :modelId="currentModel"
-          :width="widgetWidth"
-          :height="widgetHeight"
-        />
-      </div>
-      
-      <div class="widget-controls" v-show="isWidgetVisible">
-        <div class="model-control-group">
-          <select v-model="currentModel" class="model-selector" title="Live2D 模型选择">
-            <option v-for="model in discoveredModels" :key="model.id" :value="model.id">
-              {{ model.name }}
-            </option>
-          </select>
-          
-          <!-- AI 模型选择器 -->
-          <div class="ai-model-selector-wrapper">
-            <select
-              v-model="selectedAiModel"
-              class="model-selector ai-model-selector"
-              @change="handleAiModelChange"
-              :disabled="aiModelsLoading || isSavingPreference || !isLoggedIn"
-              title="AI 模型选择（需先登录）"
-            >
-              <option value="" disabled>
-                {{ aiModelsLoading ? '加载中...' : (isSavingPreference ? '保存中...' : (isLoggedIn ? '选择 AI 模型' : '请先登录')) }}
-              </option>
-              <option v-for="model in aiModels" :key="model.fullIdentifier" :value="model.fullIdentifier">
-                {{ model.protocolName }} - {{ model.modelName }}{{ model.isDefault ? ' (推荐)' : '' }}
-              </option>
-            </select>
-            <div v-if="preferenceMessage" class="preference-message" :class="preferenceMessage.type">
-              {{ preferenceMessage.text }}
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
-    
 
-    <!-- 用户信息显示 -->
-    <div class="user-info-panel" v-if="isLoggedIn && currentUser">
+    <div class="user-info-panel" v-if="!isTauri && isLoggedIn && currentUser">
       <div class="user-avatar" v-if="currentUser.avatar">
         <img :src="currentUser.avatar" :alt="currentUser.nickname" />
       </div>
@@ -178,16 +171,18 @@
       </div>
     </div>
 
-    <!-- 加载提示 -->
-    <div class="loading-tip" v-else>
+    <div class="loading-tip" v-if="discoveredModels.length === 0">
       <p>正在扫描模型...</p>
+    </div>
+
+    <div v-if="preferenceMessage" class="global-toast" :class="preferenceMessage.type">
+      {{ preferenceMessage.text }}
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import type { CSSProperties } from 'vue'
 import Live2DModel from './components/Live2DModel.vue'
 import ChatWindow from './components/ChatWindow.vue'
 import VoiceCall from './components/VoiceCall.vue'
@@ -205,8 +200,54 @@ import iconLogin from './images/zhanghudenglu-icon.png'
 import iconChat from './images/liaotian.png'
 import iconVoice from './images/a-yuyindianhuatongzhi48.png'
 import iconCharacter from './images/jiaoseguanlijiaoseshezhi.png'
-import iconHide from './images/yincang.png'
 import iconMore from './images/gengduo.png'
+
+const isTauri = ref(false)
+
+const checkTauri = async () => {
+  try {
+    if (typeof window !== 'undefined' && window.__TAURI__) {
+      isTauri.value = true
+    }
+  } catch {
+    isTauri.value = false
+  }
+}
+checkTauri()
+
+const startTauriDrag = async (e: MouseEvent) => {
+  e.preventDefault()
+  try {
+    if (window.__TAURI__) {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window')
+      await getCurrentWindow().startDragging()
+    }
+  } catch (err) {
+    console.warn('Tauri drag failed:', err)
+  }
+}
+
+const handleMinimize = async () => {
+  try {
+    if (window.__TAURI__) {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window')
+      await getCurrentWindow().minimize()
+    }
+  } catch (err) {
+    console.warn('Minimize failed:', err)
+  }
+}
+
+const handleQuit = async () => {
+  try {
+    if (window.__TAURI__) {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window')
+      await getCurrentWindow().close()
+    }
+  } catch (err) {
+    console.warn('Quit failed:', err)
+  }
+}
 
 // 模型信息接口
 interface ModelInfo {
@@ -246,36 +287,16 @@ const currentModelName = computed(() => {
 const widgetWidth = ref(300)
 const widgetHeight = ref(400)
 
-// 小窗口显示状态
-const isWidgetVisible = ref(true)
 const widgetPosX = ref<number>(0)
 const widgetPosY = ref<number>(0)
 const widgetDragging = ref(false)
 let widgetDragOffsetX = 0
 let widgetDragOffsetY = 0
 
-// 移动端断点与布局开关（小于等于768px 视为移动端）
 const isMobile = ref(false)
 const updateIsMobile = () => {
   isMobile.value = window.innerWidth <= 768
 }
-
-const widgetStyle = computed<CSSProperties>(() => {
-  if (isMobile.value) {
-    // 移动端交由媒体查询与弹性布局控制，避免 inline 样式导致 position 固定
-    return {
-      position: 'static',
-      width: '100%'
-    }
-  }
-  // 桌面端保持可拖拽的小部件
-  return {
-    position: 'fixed',
-    left: `${widgetPosX.value}px`,
-    top: `${widgetPosY.value}px`,
-    width: '320px'
-  }
-})
 
 const startWidgetDrag = (e: MouseEvent) => {
   // 移动端不启用拖拽，避免与滚动/点击冲突
@@ -359,12 +380,6 @@ watch(currentModel, (newModel, oldModel) => {
   }
 })
 
-// 切换小窗口显示/隐藏
-const toggleWidget = () => {
-  isWidgetVisible.value = !isWidgetVisible.value
-}
-
-// 播放随机动作
 const playRandomMotion = () => {
   live2dModelRef.value?.playRandomMotion()
 }
@@ -374,23 +389,8 @@ const changeExpression = () => {
   live2dModelRef.value?.playRandomExpression()
 }
 
-// 处理动画指令（来自 AI 消息的 animation 字段）
 const handleAnimation = (command: Live2DAnimationCommand) => {
   live2dModelRef.value?.executeAnimation(command)
-}
-
-// 动作/表情下拉框选中的值
-const selectedAction = ref('')
-
-// 处理动作/表情选择
-const handleActionSelect = () => {
-  if (selectedAction.value === 'motion') {
-    playRandomMotion()
-  } else if (selectedAction.value === 'expression') {
-    changeExpression()
-  }
-  // 执行后重置为默认选项
-  selectedAction.value = ''
 }
 
 // 切换聊天窗口
@@ -653,40 +653,11 @@ const handleClickOutside = (e: MouseEvent) => {
   height: 100dvh;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #FFDEE9 0%, #B5FFFC 100%);
 }
 
-.main-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  color: white;
-  text-align: center;
-  padding: 20px;
-}
-
-.main-content h1 {
-  font-size: 3rem;
-  margin-bottom: 1rem;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.main-content p {
-  font-size: 1.2rem;
-  max-width: 600px;
-  line-height: 1.6;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
-}
-
-.model-count {
-  margin-top: 1rem;
-  font-size: 1rem;
-  opacity: 0.9;
-  background: rgba(255, 255, 255, 0.1);
-  padding: 8px 16px;
-  border-radius: 20px;
+.app-container.desktop-pet {
+  background: transparent;
 }
 
 .loading-tip {
@@ -694,239 +665,135 @@ const handleClickOutside = (e: MouseEvent) => {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  color: white;
+  color: #C44569;
   font-size: 1.2rem;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-/* Live2D 固定小窗口 */
-.live2d-widget {
+.pet-container {
   position: fixed;
-  /* 通过 :style 控制 left/top */
   width: 320px;
-  background: rgba(255, 255, 255, 0.98);
-  border-radius: 16px;
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25);
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 20px;
+  box-shadow: 0 12px 48px rgba(255, 107, 157, 0.2);
   backdrop-filter: blur(10px);
-  overflow: hidden;
+  overflow: visible;
   z-index: 1000;
   transition: all 0.3s ease;
+  border: 1.5px solid rgba(255, 107, 157, 0.15);
 }
 
-.live2d-widget:hover {
-  box-shadow: 0 16px 64px rgba(0, 0, 0, 0.35);
-  transform: translateY(-4px);
+.pet-container:hover {
+  box-shadow: 0 16px 64px rgba(255, 107, 157, 0.3);
 }
 
-.widget-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  cursor: move;
-  user-select: none;
-}
-
-.widget-title {
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-}
-
-.close-btn {
-  width: 28px;
-  height: 28px;
+.pet-container.desktop-pet {
+  background: transparent;
   border: none;
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  border-radius: 50%;
-  cursor: pointer;
-  font-size: 20px;
-  line-height: 1;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  overflow: visible;
+  width: auto;
+  height: 100vh;
   display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
 }
 
-.close-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(1.1);
+.pet-container.desktop-pet:hover {
+  box-shadow: none;
 }
 
-.widget-toolbar {
+.pet-model-area {
+  width: 100%;
+  height: 400px;
+  background: linear-gradient(180deg, #FFF5F9 0%, #ffffff 100%);
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px 20px 0 0;
+}
+
+.pet-model-area.desktop-pet {
+  flex: 1;
+  width: 100vw;
+  height: auto;
+  background: transparent;
+  cursor: grab;
+}
+
+.pet-model-area.desktop-pet:active {
+  cursor: grabbing;
+}
+
+.pet-toolbar {
   padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.98);
-  border-top: 1px solid #e9ecef;
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid #FFE0EB;
+}
+
+.pet-toolbar.desktop-pet {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(16px);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 107, 157, 0.15);
+  padding: 8px 12px;
+  box-shadow: 0 8px 32px rgba(255, 107, 157, 0.15);
+  z-index: 1001;
+  opacity: 0.3;
+  transition: opacity 0.3s ease;
+}
+
+.pet-toolbar.desktop-pet:hover {
+  opacity: 1;
 }
 
 .toolbar-buttons {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  align-items: center;
 }
 
-.widget-body {
-  width: 100%;
-  height: 400px;
-  background: linear-gradient(180deg, #f8f9ff 0%, #ffffff 100%);
-  position: relative;
-  overflow: hidden;
-}
-
-.widget-controls {
-  padding: 12px 16px;
-  background: #f8f9fa;
-  border-top: 1px solid #e9ecef;
-}
-
-.model-control-group {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.ai-model-selector-wrapper {
-  position: relative;
-}
-
-.ai-model-selector {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  cursor: pointer;
-}
-
-.preference-message {
-  position: absolute;
-  top: -35px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  animation: fadeIn 0.2s ease;
-  z-index: 10;
-}
-
-.preference-message.success {
-  background: #4caf50;
-  color: white;
-}
-
-.preference-message.error {
-  background: #f44336;
-  color: white;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-}
-
-.ai-model-selector:hover:not(:disabled) {
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
-}
-
-.ai-model-selector:focus {
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
-}
-
-.ai-model-selector:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  background: #ccc;
-}
-
-.model-selector {
-  width: 100%;
-  padding: 10px 14px;
-  font-size: 14px;
-  color: #333;
-  background: white;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  outline: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-weight: 500;
-}
-
-.model-selector:hover {
-  border-color: #667eea;
-}
-
-.model-selector:focus {
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-/* 控制台按钮面板 */
-.control-panel {
-  position: fixed;
-  bottom: 20px;
-  right: 360px; /* 小窗口宽度320px + 间距20px + 边距20px */
-  background: rgba(255, 255, 255, 0.98);
-  border-radius: 16px;
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(10px);
-  padding: 12px;
-  z-index: 999;
-  transition: all 0.3s ease;
-  border: 2px solid rgba(102, 126, 234, 0.2);
-}
-
-.control-panel:hover {
-  box-shadow: 0 16px 64px rgba(0, 0, 0, 0.35);
-  border-color: rgba(102, 126, 234, 0.4);
-}
-
-.control-buttons {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
+.pet-toolbar.desktop-pet .toolbar-buttons {
+  flex-wrap: nowrap;
   gap: 8px;
-  max-width: 280px;
 }
 
 .control-btn {
   width: 48px;
   height: 48px;
   border: none;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
   color: white;
-  border-radius: 10px;
+  border-radius: 14px;
   cursor: pointer;
   font-size: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 12px rgba(255, 107, 157, 0.3);
 }
 
 .control-btn:hover {
   transform: translateY(-2px) scale(1.05);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 6px 20px rgba(255, 107, 157, 0.4);
 }
 
 .control-btn:active {
   transform: translateY(0) scale(0.98);
 }
 
-.control-btn span {
-  display: block;
-  line-height: 1;
+.pet-toolbar.desktop-pet .control-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(255, 107, 157, 0.2);
 }
 
 .btn-icon {
@@ -934,30 +801,20 @@ const handleClickOutside = (e: MouseEvent) => {
   height: 24px;
   object-fit: contain;
   pointer-events: none;
+  filter: brightness(0) invert(1);
+}
+
+.pet-toolbar.desktop-pet .btn-icon {
+  width: 20px;
+  height: 20px;
 }
 
 .login-btn {
-  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-}
-
-.login-btn:hover {
-  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
-}
-
-.qrcode-btn {
-  background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
-}
-
-.qrcode-btn:hover {
-  box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4);
+  background: linear-gradient(135deg, #FF8A9E 0%, #FF6B9D 100%);
 }
 
 .logout-btn {
-  background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
-}
-
-.logout-btn:hover {
-  box-shadow: 0 6px 20px rgba(255, 152, 0, 0.4);
+  background: linear-gradient(135deg, #E84393 0%, #C44569 100%);
 }
 
 .more-menu-wrapper {
@@ -965,32 +822,30 @@ const handleClickOutside = (e: MouseEvent) => {
 }
 
 .more-btn {
-  background: linear-gradient(135deg, #607D8B 0%, #455A64 100%);
-}
-
-.more-btn:hover {
-  box-shadow: 0 6px 20px rgba(96, 125, 139, 0.4);
+  background: linear-gradient(135deg, #FDA7DF 0%, #FF8A9E 100%);
 }
 
 .more-dropdown {
   position: absolute;
-  top: 100%;
+  bottom: 100%;
   right: 0;
-  margin-top: 6px;
+  margin-bottom: 8px;
   background: rgba(255, 255, 255, 0.98);
-  border-radius: 10px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(255, 107, 157, 0.2);
   backdrop-filter: blur(10px);
-  min-width: 150px;
-  z-index: 1001;
+  min-width: 200px;
+  z-index: 1002;
   overflow: hidden;
   animation: dropdownFadeIn 0.15s ease;
+  border: 1px solid #FFE0EB;
+  padding: 6px 0;
 }
 
 @keyframes dropdownFadeIn {
   from {
     opacity: 0;
-    transform: translateY(-6px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -998,15 +853,61 @@ const handleClickOutside = (e: MouseEvent) => {
   }
 }
 
+.dropdown-section-label {
+  padding: 6px 14px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #FF8A9E;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.dropdown-select-wrapper {
+  padding: 2px 10px;
+}
+
+.dropdown-select {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: #333;
+  background: #FFF5F9;
+  border: 1.5px solid #FFD0E0;
+  border-radius: 8px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.dropdown-select:hover {
+  border-color: #FF6B9D;
+}
+
+.dropdown-select:focus {
+  border-color: #FF6B9D;
+  box-shadow: 0 0 0 2px rgba(255, 107, 157, 0.1);
+}
+
+.dropdown-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: #FFE0EB;
+  margin: 4px 10px;
+}
+
 .dropdown-item {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 10px 14px;
+  padding: 8px 14px;
   border: none;
   background: transparent;
-  color: #333;
+  color: #555;
   font-size: 14px;
   cursor: pointer;
   transition: background 0.15s ease;
@@ -1014,7 +915,8 @@ const handleClickOutside = (e: MouseEvent) => {
 }
 
 .dropdown-item:hover {
-  background: rgba(102, 126, 234, 0.08);
+  background: rgba(255, 107, 157, 0.08);
+  color: #C44569;
 }
 
 .dropdown-icon {
@@ -1025,39 +927,36 @@ const handleClickOutside = (e: MouseEvent) => {
 }
 
 .dropdown-emoji {
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1;
   flex-shrink: 0;
   width: 20px;
   text-align: center;
 }
 
-/* 移动端用户名显示 */
 .mobile-user-name {
   display: none;
 }
 
-/* 用户信息面板 */
 .user-info-panel {
   position: fixed;
   top: 20px;
   right: 20px;
   background: rgba(255, 255, 255, 0.98);
-  border-radius: 16px;
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25);
+  border-radius: 20px;
+  box-shadow: 0 12px 48px rgba(255, 107, 157, 0.2);
   backdrop-filter: blur(10px);
   padding: 16px 20px;
   display: flex;
   align-items: center;
   gap: 12px;
   z-index: 998;
-  border: 2px solid rgba(76, 175, 80, 0.2);
+  border: 2px solid rgba(255, 107, 157, 0.15);
   transition: all 0.3s ease;
 }
 
 .user-info-panel:hover {
-  box-shadow: 0 16px 64px rgba(0, 0, 0, 0.35);
-  border-color: rgba(76, 175, 80, 0.4);
+  box-shadow: 0 16px 64px rgba(255, 107, 157, 0.3);
 }
 
 .user-avatar {
@@ -1065,7 +964,7 @@ const handleClickOutside = (e: MouseEvent) => {
   height: 48px;
   border-radius: 50%;
   overflow: hidden;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1088,20 +987,55 @@ const handleClickOutside = (e: MouseEvent) => {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  color: #333;
+  color: #C44569;
 }
 
 .user-id {
   margin: 0;
   font-size: 12px;
-  color: #999;
+  color: #FF8A9E;
   font-family: 'Courier New', monospace;
 }
 
-/* 响应式设计 */
+.global-toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 9999;
+  animation: toastFadeIn 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.global-toast.success {
+  background: rgba(255, 138, 158, 0.95);
+  color: white;
+  box-shadow: 0 4px 16px rgba(255, 107, 157, 0.3);
+}
+
+.global-toast.error {
+  background: rgba(244, 67, 54, 0.95);
+  color: white;
+  box-shadow: 0 4px 16px rgba(244, 67, 54, 0.3);
+}
+
+@keyframes toastFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
 @media (max-width: 768px) {
-  /* Live2D小窗口 - 全屏布局（改为纵向弹性布局，避免头部/控件遮挡画布） */
-  .live2d-widget {
+  .pet-container {
     width: 100vw;
     height: 100dvh;
     display: flex;
@@ -1113,72 +1047,36 @@ const handleClickOutside = (e: MouseEvent) => {
     border-radius: 0;
     box-shadow: none;
   }
-  
-  .widget-header {
-    position: static;
-    padding: 8px 12px;
-    margin: calc(env(safe-area-inset-top) + 10px) 10px 8px;
-    border-radius: 12px;
-    background: rgba(102, 126, 234, 0.95);
-    backdrop-filter: blur(10px);
-    z-index: 1;
+
+  .pet-model-area {
+    width: 100%;
+    height: auto;
+    position: relative;
+    left: 0;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
   }
-  
-  .widget-title {
-    font-size: 14px;
-  }
-  
-  .close-btn {
-    width: 24px;
-    height: 24px;
-    font-size: 16px;
-  }
-  
-  .widget-toolbar {
+
+  .pet-toolbar {
     position: static;
     margin: 8px 10px;
     padding: 10px;
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
-    border-radius: 12px;
+    border-radius: 14px;
     border: none;
   }
-  
+
   .toolbar-buttons {
     justify-content: center;
   }
-  
-  .widget-body {
-    width: 100%;
-    height: auto;
-    position: relative;
-    left: 0;
-    flex: 1 1 auto; /* 占据剩余空间，避免与头部/控件重叠 */
-    min-height: 0;  /* 允许在弹性容器内正确收缩 */
-    overflow: hidden;
-  }
-  
-  .widget-controls {
-    position: static;
-    margin: 8px 10px;
-    z-index: 1;
-    padding: 8px 12px;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    border-radius: 12px;
-    border: none;
-  }
-  
-  .model-selector {
-    padding: 8px 12px;
-    font-size: 13px;
-  }
-  
+
   .control-btn {
     width: 44px;
     height: 44px;
     font-size: 18px;
-    border-radius: 10px;
+    border-radius: 12px;
   }
 
   .btn-icon {
@@ -1186,39 +1084,25 @@ const handleClickOutside = (e: MouseEvent) => {
     height: 22px;
   }
 
-  .more-dropdown {
-    right: -10px;
-  }
-  
-  /* 移动端用户名显示 - 显示在按钮旁边 */
   .mobile-user-name {
     display: block;
     flex: 1 1 auto;
     min-width: 0;
     padding: 10px 12px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
     color: white;
-    border-radius: 10px;
+    border-radius: 12px;
     font-size: 14px;
     font-weight: 500;
     text-align: center;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 4px 12px rgba(255, 107, 157, 0.3);
   }
-  
-  /* 移动端隐藏独立的用户信息面板 */
+
   .user-info-panel {
     display: none;
-  }
-  
-  .main-content h1 {
-    font-size: 2rem;
-  }
-  
-  .main-content p {
-    font-size: 1rem;
   }
 }
 </style>

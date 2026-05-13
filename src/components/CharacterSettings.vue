@@ -426,18 +426,20 @@ watch(() => props.visible, (val) => {
   align-items: center;
   justify-content: center;
   z-index: 2000;
+  backdrop-filter: blur(5px);
 }
 
 .character-modal {
   background: #fff;
-  border-radius: 16px;
+  border-radius: 20px;
   width: 520px;
   max-width: 95vw;
   max-height: 85vh;
   overflow-y: auto;
   padding: 28px 32px;
   position: relative;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 20px 60px rgba(255, 107, 157, 0.2);
+  border: 1.5px solid rgba(255, 107, 157, 0.15);
 }
 
 .close-btn {
@@ -465,14 +467,14 @@ watch(() => props.visible, (val) => {
   margin: 0 0 20px;
   font-size: 20px;
   font-weight: 700;
-  color: #333;
+  color: #C44569;
 }
 
 .tab-bar {
   display: flex;
   gap: 0;
   margin-bottom: 20px;
-  border-bottom: 2px solid #e9ecef;
+  border-bottom: 2px solid #FFE0EB;
 }
 
 .tab {
@@ -490,12 +492,12 @@ watch(() => props.visible, (val) => {
 }
 
 .tab.active {
-  color: #667eea;
-  border-bottom-color: #667eea;
+  color: #FF6B9D;
+  border-bottom-color: #FF6B9D;
 }
 
 .tab:hover {
-  color: #667eea;
+  color: #FF6B9D;
 }
 
 .tab-content {
@@ -540,8 +542,8 @@ watch(() => props.visible, (val) => {
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #FF6B9D;
+  box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.1);
 }
 
 .form-group textarea {
@@ -609,9 +611,9 @@ watch(() => props.visible, (val) => {
 }
 
 .upload-add-btn:hover:not(:disabled) {
-  border-color: #667eea;
-  color: #667eea;
-  background: #f0f3ff;
+  border-color: #FF6B9D;
+  color: #FF6B9D;
+  background: #FFF5F9;
 }
 
 .upload-add-btn:disabled {
@@ -624,9 +626,9 @@ watch(() => props.visible, (val) => {
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  background: #f0f3ff;
-  border-radius: 8px;
-  border: 1.5px solid #c5cae9;
+  background: #FFF5F9;
+  border-radius: 10px;
+  border: 1.5px solid #FFD0E0;
 }
 
 .audio-file-name {
@@ -675,12 +677,12 @@ watch(() => props.visible, (val) => {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
   color: #fff;
 }
 
 .btn-primary:hover:not(:disabled) {
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 12px rgba(255, 107, 157, 0.4);
 }
 
 .btn-secondary {
@@ -694,10 +696,10 @@ watch(() => props.visible, (val) => {
 
 .btn-outline {
   padding: 10px 20px;
-  border: 1.5px solid #667eea;
-  border-radius: 8px;
+  border: 1.5px solid #FF6B9D;
+  border-radius: 10px;
   background: #fff;
-  color: #667eea;
+  color: #FF6B9D;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -705,7 +707,7 @@ watch(() => props.visible, (val) => {
 }
 
 .btn-outline:hover:not(:disabled) {
-  background: #f0f3ff;
+  background: #FFF5F9;
 }
 
 .btn-outline:disabled {
@@ -775,7 +777,7 @@ watch(() => props.visible, (val) => {
 .voice-badge {
   font-size: 11px;
   padding: 2px 8px;
-  background: #4caf50;
+  background: #FF6B9D;
   color: #fff;
   border-radius: 10px;
   font-weight: 600;
@@ -808,7 +810,7 @@ watch(() => props.visible, (val) => {
 }
 
 .message.success {
-  background: #4caf50;
+  background: #FF6B9D;
   color: #fff;
 }
 
