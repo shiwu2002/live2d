@@ -52,40 +52,70 @@
       
       <div class="widget-toolbar" v-show="isWidgetVisible">
         <div class="toolbar-buttons">
-          <button 
-            v-if="!isLoggedIn" 
-            class="control-btn login-btn" 
-            @click="toggleUserAuthModal" 
+          <button
+            v-if="!isLoggedIn"
+            class="control-btn login-btn"
+            @click="toggleUserAuthModal"
             title="账号密码登录"
           >
-            <span>🔐</span>
+            <img :src="iconLogin" alt="登录" class="btn-icon" />
           </button>
-          <button 
-            v-else 
-            class="control-btn logout-btn" 
-            @click="handleLogout" 
+          <button
+            v-else
+            class="control-btn logout-btn"
+            @click="handleLogout"
             :title="`${currentUser?.nickname || '用户'} - 退出登录`"
           >
-            <span>👤</span>
+            <img :src="iconLogin" alt="退出登录" class="btn-icon" />
           </button>
           <button class="control-btn" @click="toggleChat" title="聊天窗口">
-            <span>💬</span>
+            <img :src="iconChat" alt="聊天" class="btn-icon" />
           </button>
           <button class="control-btn" @click="toggleVoiceCall" title="语音通话">
-            <span>🎤</span>
+            <img :src="iconVoice" alt="语音通话" class="btn-icon" />
           </button>
-          <button class="control-btn" @click="toggleCharacterSettings" title="角色设置" :style="!isLoggedIn ? 'opacity:0.4' : ''">
-            <span>🎭</span>
-          </button>
-          <select class="control-select" @change="handleActionSelect" v-model="selectedAction" title="动作/表情">
-            <option value="">🎭</option>
-            <option value="motion">🎭 随机动作</option>
-            <option value="expression">😊 随机表情</option>
-          </select>
-          <button class="control-btn" @click="toggleWidget" title="显示/隐藏">
-            <span>{{ isWidgetVisible ? '👁️' : '👁️‍🗨️' }}</span>
-          </button>
-          <!-- 移动端用户名显示 -->
+
+          <div class="more-menu-wrapper">
+            <button class="control-btn more-btn" @click="showMoreMenu = !showMoreMenu" title="更多">
+              <img :src="iconMore" alt="更多" class="btn-icon" />
+            </button>
+            <div class="more-dropdown" v-show="showMoreMenu">
+              <button
+                class="dropdown-item"
+                @click="toggleCharacterSettings(); showMoreMenu = false"
+                :style="!isLoggedIn ? 'opacity:0.4' : ''"
+                title="角色设置"
+              >
+                <img :src="iconCharacter" alt="角色设置" class="dropdown-icon" />
+                <span>角色设置</span>
+              </button>
+              <button
+                class="dropdown-item"
+                @click="playRandomMotion(); showMoreMenu = false"
+                title="随机动作"
+              >
+                <span class="dropdown-emoji">🎭</span>
+                <span>随机动作</span>
+              </button>
+              <button
+                class="dropdown-item"
+                @click="changeExpression(); showMoreMenu = false"
+                title="随机表情"
+              >
+                <span class="dropdown-emoji">😊</span>
+                <span>随机表情</span>
+              </button>
+              <button
+                class="dropdown-item"
+                @click="toggleWidget(); showMoreMenu = false"
+                title="隐藏窗口"
+              >
+                <img :src="iconHide" alt="隐藏" class="dropdown-icon" />
+                <span>隐藏窗口</span>
+              </button>
+            </div>
+          </div>
+
           <div v-if="isLoggedIn && currentUser" class="mobile-user-name">
             {{ currentUser.nickname || '微信用户' }}
           </div>
@@ -170,6 +200,13 @@ import type { UserLoginInfo, UserInfo } from './types/login'
 import type { Live2DAnimationCommand } from './types/live2d'
 import { authService } from './services/authService'
 import { aiModelConfigService, aiModelSwitchService, type ModelConfig } from './services/aiModelConfig'
+
+import iconLogin from './images/zhanghudenglu-icon.png'
+import iconChat from './images/liaotian.png'
+import iconVoice from './images/a-yuyindianhuatongzhi48.png'
+import iconCharacter from './images/jiaoseguanlijiaoseshezhi.png'
+import iconHide from './images/yincang.png'
+import iconMore from './images/gengduo.png'
 
 // 模型信息接口
 interface ModelInfo {
@@ -278,6 +315,9 @@ const showUserAuthModal = ref(false)
 
 // 角色设置窗口状态
 const showCharacterSettings = ref(false)
+
+// 更多菜单下拉状态
+const showMoreMenu = ref(false)
 
 // 用户登录状态
 const isLoggedIn = ref(false)
@@ -584,6 +624,8 @@ onMounted(() => {
   updateIsMobile()
   window.addEventListener('resize', updateIsMobile)
 
+  document.addEventListener('click', handleClickOutside)
+
   const w = window.innerWidth
   const h = window.innerHeight
   const width = 320
@@ -594,7 +636,15 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', updateIsMobile)
+  document.removeEventListener('click', handleClickOutside)
 })
+
+const handleClickOutside = (e: MouseEvent) => {
+  const target = e.target as HTMLElement
+  if (!target.closest('.more-menu-wrapper')) {
+    showMoreMenu.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -879,6 +929,13 @@ onUnmounted(() => {
   line-height: 1;
 }
 
+.btn-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
 .login-btn {
   background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
 }
@@ -903,43 +960,76 @@ onUnmounted(() => {
   box-shadow: 0 6px 20px rgba(255, 152, 0, 0.4);
 }
 
-/* 动作/表情下拉框样式 */
-.control-select {
-  width: 48px;
-  height: 48px;
-  padding: 0;
-  font-size: 20px;
-  color: white;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
+.more-menu-wrapper {
+  position: relative;
+}
+
+.more-btn {
+  background: linear-gradient(135deg, #607D8B 0%, #455A64 100%);
+}
+
+.more-btn:hover {
+  box-shadow: 0 6px 20px rgba(96, 125, 139, 0.4);
+}
+
+.more-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 6px;
+  background: rgba(255, 255, 255, 0.98);
   border-radius: 10px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-  outline: none;
-  text-align: center;
-  text-align-last: center;
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+  min-width: 150px;
+  z-index: 1001;
+  overflow: hidden;
+  animation: dropdownFadeIn 0.15s ease;
 }
 
-.control-select:hover {
-  transform: translateY(-2px) scale(1.05);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.control-select:active {
-  transform: translateY(0) scale(0.98);
-}
-
-.control-select option {
-  background: white;
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
   color: #333;
-  padding: 8px;
   font-size: 14px;
-  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  white-space: nowrap;
+}
+
+.dropdown-item:hover {
+  background: rgba(102, 126, 234, 0.08);
+}
+
+.dropdown-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.dropdown-emoji {
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
 }
 
 /* 移动端用户名显示 */
@@ -1089,6 +1179,15 @@ onUnmounted(() => {
     height: 44px;
     font-size: 18px;
     border-radius: 10px;
+  }
+
+  .btn-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .more-dropdown {
+    right: -10px;
   }
   
   /* 移动端用户名显示 - 显示在按钮旁边 */
