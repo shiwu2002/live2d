@@ -18,6 +18,8 @@
     "core:window:allow-set-decorations",
     "core:window:allow-set-skip-taskbar",
     "core:window:allow-inner-size",
-    "core:window:allow-outer-size"
+    "core:window:allow-outer-size",
+    "core:webview:default",
+    "core:webview:allow-set-webview-background-color"
   ]
 }

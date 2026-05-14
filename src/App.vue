@@ -1,5 +1,5 @@
 <template>
-  <div class="app-container" :class="{ 'desktop-pet': isTauri }">
+  <div class="app-container desktop-pet">
     <ChatWindow
       v-if="showChat"
       :ws-url="wsConfig.baseUrl"
@@ -36,13 +36,9 @@
       @saved="handleCharacterSaved"
     />
 
-    <div v-if="discoveredModels.length > 0" class="pet-container" :class="{ 'desktop-pet': isTauri }">
-      <div
-        class="pet-model-area"
-        :class="{ 'desktop-pet': isTauri }"
-        @mousedown="isTauri ? startTauriDrag() : startWidgetDrag($event)"
-      >
-        <div v-if="isTauri" class="drag-handle" data-tauri-drag-region @mousedown.stop title="拖拽移动窗口">
+    <div v-if="discoveredModels.length > 0" class="pet-container desktop-pet">
+      <div class="pet-model-area desktop-pet">
+        <div class="drag-handle" @mousedown="handleDragStart" title="拖拽移动窗口">
           <div class="drag-indicator"></div>
         </div>
         <Live2DModel
@@ -57,7 +53,7 @@
         />
       </div>
 
-      <div class="pet-toolbar" :class="{ 'desktop-pet': isTauri }">
+      <div class="pet-toolbar desktop-pet">
         <div class="toolbar-buttons">
           <button
             v-if="!isLoggedIn"
@@ -173,7 +169,7 @@
       </div>
     </div>
 
-    <div class="user-info-panel" v-if="!isTauri && isLoggedIn && currentUser">
+    <div class="user-info-panel" v-if="isLoggedIn && currentUser">
       <div class="user-avatar" v-if="currentUser.avatar">
         <img :src="currentUser.avatar" :alt="currentUser.nickname" />
       </div>
@@ -215,37 +211,36 @@ import iconCharacter from './images/jiaoseguanlijiaoseshezhi.png'
 import iconMore from './images/gengduo.png'
 
 const isTauri = ref(false)
-let tauriGetCurrentWindow: (() => any) | null = null
 
-const checkTauri = async () => {
+const detectTauri = async () => {
+  if (isTauri.value) return true
   try {
-    if (typeof window !== 'undefined' && window.__TAURI__) {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    const win = getCurrentWindow()
+    if (win) {
       isTauri.value = true
-      const { getCurrentWindow } = await import('@tauri-apps/api/window')
-      tauriGetCurrentWindow = getCurrentWindow
+      return true
     }
-  } catch {
-    isTauri.value = false
-  }
+  } catch {}
+  return false
 }
-checkTauri()
 
-const startTauriDrag = async () => {
+const handleDragStart = async (_e: MouseEvent) => {
+  console.log('handleDragStart called')
   try {
-    if (tauriGetCurrentWindow) {
-      await tauriGetCurrentWindow().startDragging()
-    }
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    console.log('calling startDragging...')
+    await getCurrentWindow().startDragging()
+    console.log('startDragging done')
   } catch (err) {
-    console.warn('Tauri drag failed:', err)
+    console.error('Tauri drag failed:', err)
   }
 }
 
 const handleMinimize = async () => {
   try {
-    if (window.__TAURI__) {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window')
-      await getCurrentWindow().minimize()
-    }
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    await getCurrentWindow().minimize()
   } catch (err) {
     console.warn('Minimize failed:', err)
   }
@@ -253,10 +248,8 @@ const handleMinimize = async () => {
 
 const handleQuit = async () => {
   try {
-    if (window.__TAURI__) {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window')
-      await getCurrentWindow().close()
-    }
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    await getCurrentWindow().close()
   } catch (err) {
     console.warn('Quit failed:', err)
   }
@@ -302,39 +295,10 @@ const widgetHeight = ref(400)
 
 const widgetPosX = ref<number>(0)
 const widgetPosY = ref<number>(0)
-const widgetDragging = ref(false)
-let widgetDragOffsetX = 0
-let widgetDragOffsetY = 0
 
 const isMobile = ref(false)
 const updateIsMobile = () => {
   isMobile.value = window.innerWidth <= 768
-}
-
-const startWidgetDrag = (e: MouseEvent) => {
-  // 移动端不启用拖拽，避免与滚动/点击冲突
-  if (isMobile.value) return
-  widgetDragging.value = true
-  widgetDragOffsetX = e.clientX - widgetPosX.value
-  widgetDragOffsetY = e.clientY - widgetPosY.value
-  window.addEventListener('mousemove', onWidgetDrag)
-  window.addEventListener('mouseup', endWidgetDrag)
-}
-
-const onWidgetDrag = (e: MouseEvent) => {
-  if (!widgetDragging.value) return
-  const w = window.innerWidth
-  const h = window.innerHeight
-  const width = 320
-  const height = 400 + 56 + 56
-  widgetPosX.value = Math.min(Math.max(0, e.clientX - widgetDragOffsetX), w - width)
-  widgetPosY.value = Math.min(Math.max(0, e.clientY - widgetDragOffsetY), h - Math.min(h - 20, height))
-}
-
-const endWidgetDrag = () => {
-  widgetDragging.value = false
-  window.removeEventListener('mousemove', onWidgetDrag)
-  window.removeEventListener('mouseup', endWidgetDrag)
 }
 
 // 聊天窗口状态
@@ -639,7 +603,7 @@ if (modelIds.length > 0) {
 // 输出环境配置信息（开发时便于调试）
 logEnvConfig()
 
-onMounted(() => {
+onMounted(async () => {
   updateIsMobile()
   window.addEventListener('resize', updateIsMobile)
 
@@ -651,6 +615,20 @@ onMounted(() => {
   const height = 400 + 56 + 56
   widgetPosX.value = Math.max(0, w - width - 20)
   widgetPosY.value = Math.max(0, h - Math.min(h - 20, height) - 20)
+
+  await detectTauri()
+  console.log('onMounted tauri check, isTauri:', isTauri.value)
+
+  ;(async () => {
+    try {
+      console.log('trying setWebviewBackground...')
+      const { getCurrentWebview } = await import('@tauri-apps/api/webview')
+      await getCurrentWebview().setBackgroundColor('#00000000')
+      console.log('Webview background set to transparent')
+    } catch (e) {
+      console.log('setBackgroundColor not available:', e)
+    }
+  })()
 })
 
 onUnmounted(() => {
@@ -676,6 +654,7 @@ const handleClickOutside = (e: MouseEvent) => {
 }
 
 .app-container.desktop-pet {
+  min-height: 100vh;
   background: transparent;
 }
 
@@ -737,8 +716,8 @@ const handleClickOutside = (e: MouseEvent) => {
   flex: 1;
   width: 100vw;
   height: auto;
-  background: transparent;
-  cursor: grab;
+  background: transparent !important;
+  cursor: default;
 }
 
 .pet-model-area.desktop-pet:active {
@@ -760,6 +739,9 @@ const handleClickOutside = (e: MouseEvent) => {
   background: rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(8px);
   transition: background 0.2s ease;
+  -webkit-app-region: drag;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .drag-handle:hover {
@@ -798,6 +780,11 @@ const handleClickOutside = (e: MouseEvent) => {
   z-index: 1001;
   opacity: 0.3;
   transition: opacity 0.3s ease;
+  -webkit-app-region: no-drag;
+}
+
+.pet-toolbar.desktop-pet * {
+  -webkit-app-region: no-drag;
 }
 
 .pet-toolbar.desktop-pet:hover {

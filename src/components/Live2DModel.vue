@@ -398,10 +398,12 @@ watch(() => props.modelPath, async () => {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  background: transparent;
 }
 
 .live2d-container canvas {
   width: 100% !important;
   height: 100% !important;
+  background: transparent;
 }
 </style>
