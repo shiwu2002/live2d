@@ -52,13 +52,12 @@ const identifyBackgroundDrawables = () => {
     }
   })
 
-  if (backgroundDrawableIndices.length > 0) {
-    console.log('Identified background drawables:', backgroundDrawableIndices.map(i => ({
-      index: i,
-      id: drawables.ids?.[i],
-      renderOrder: drawables.renderOrders?.[i]
-    })))
-  }
+  console.log('=== Live2D Background Detection ===')
+  console.log('Total drawables:', renderOrders.length)
+  console.log('Min render order:', minRenderOrder)
+  console.log('Background drawable indices:', backgroundDrawableIndices)
+  console.log('Background drawable IDs:', backgroundDrawableIndices.map(i => drawables.ids?.[i]))
+  console.log('hideBackground prop:', props.hideBackground)
 }
 
 const blinkState = {
@@ -229,6 +228,10 @@ const startRenderLoop = () => {
     }
   })
 }
+
+watch(() => props.hideBackground, (val) => {
+  console.log('hideBackground changed to:', val, 'backgroundDrawableIndices:', backgroundDrawableIndices)
+})
 
 const playMotion = (group: string, index = 0) => {
   if (!model) {

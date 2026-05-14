@@ -620,14 +620,40 @@ onMounted(async () => {
   console.log('onMounted tauri check, isTauri:', isTauri.value)
 
   ;(async () => {
+    console.log('=== STARTING TRANSPARENCY SETUP ===')
+
     try {
-      console.log('trying setWebviewBackground...')
       const { getCurrentWebview } = await import('@tauri-apps/api/webview')
-      await getCurrentWebview().setBackgroundColor('#00000000')
-      console.log('Webview background set to transparent')
+      const wv = getCurrentWebview()
+      console.log('got webview:', !!wv)
+      await wv.setBackgroundColor('#00000000')
+      console.log('✅ Webview setBackgroundColor done')
     } catch (e) {
-      console.log('setBackgroundColor not available:', e)
+      console.warn('⚠️ setBackgroundColor failed:', e)
     }
+
+    try {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window')
+      const win = getCurrentWindow()
+      console.log('got window:', !!win)
+      await win.setBackgroundColor('#00000000')
+      console.log('✅ Window setBackgroundColor done')
+    } catch (e) {
+      console.warn('⚠️ Window setBackgroundColor failed:', e)
+    }
+
+    const style = document.createElement('style')
+    style.textContent = `
+      html, body, #app,
+      .app-container, .pet-container, .pet-model-area,
+      .live2d-container, canvas {
+        background: transparent !important;
+        background-color: transparent !important;
+      }
+    `
+    document.head.appendChild(style)
+    console.log('✅ Injected force-transparent styles')
+    console.log('=== TRANSPARENCY SETUP DONE ===')
   })()
 })
 
@@ -655,7 +681,7 @@ const handleClickOutside = (e: MouseEvent) => {
 
 .app-container.desktop-pet {
   min-height: 100vh;
-  background: transparent;
+  background: transparent !important;
 }
 
 .loading-tip {
@@ -685,7 +711,7 @@ const handleClickOutside = (e: MouseEvent) => {
 }
 
 .pet-container.desktop-pet {
-  background: transparent;
+  background: transparent !important;
   border: none;
   border-radius: 0;
   box-shadow: none;
