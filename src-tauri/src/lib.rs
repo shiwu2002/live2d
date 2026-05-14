@@ -9,15 +9,6 @@ pub fn run() {
             .build(),
         )?;
       }
-
-      #[cfg(target_os = "macos")]
-      {
-        use tauri::Manager;
-        if let Some(window) = app.get_webview_window("main") {
-          let _ = window.set_transparent(true);
-        }
-      }
-
       Ok(())
     })
     .run(tauri::generate_context!())

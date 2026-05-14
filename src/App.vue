@@ -40,8 +40,11 @@
       <div
         class="pet-model-area"
         :class="{ 'desktop-pet': isTauri }"
-        @mousedown="isTauri ? startTauriDrag($event) : startWidgetDrag($event)"
+        @mousedown="isTauri ? startTauriDrag() : startWidgetDrag($event)"
       >
+        <div v-if="isTauri" class="drag-handle" data-tauri-drag-region @mousedown.stop title="拖拽移动窗口">
+          <div class="drag-indicator"></div>
+        </div>
         <Live2DModel
           v-if="modelPath"
           ref="live2dModelRef"
@@ -50,6 +53,7 @@
           :modelId="currentModel"
           :width="widgetWidth"
           :height="widgetHeight"
+          :hideBackground="hideBackground"
         />
       </div>
 
@@ -134,6 +138,14 @@
                 <span class="dropdown-emoji">😊</span>
                 <span>随机表情</span>
               </button>
+              <button
+                class="dropdown-item"
+                @click="toggleBackground(); showMoreMenu = false"
+                :title="hideBackground ? '显示背景' : '隐藏背景'"
+              >
+                <span class="dropdown-emoji">🖼️</span>
+                <span>{{ hideBackground ? '显示背景' : '隐藏背景' }}</span>
+              </button>
               <div class="dropdown-divider"></div>
               <button
                 class="dropdown-item"
@@ -203,11 +215,14 @@ import iconCharacter from './images/jiaoseguanlijiaoseshezhi.png'
 import iconMore from './images/gengduo.png'
 
 const isTauri = ref(false)
+let tauriGetCurrentWindow: (() => any) | null = null
 
 const checkTauri = async () => {
   try {
     if (typeof window !== 'undefined' && window.__TAURI__) {
       isTauri.value = true
+      const { getCurrentWindow } = await import('@tauri-apps/api/window')
+      tauriGetCurrentWindow = getCurrentWindow
     }
   } catch {
     isTauri.value = false
@@ -215,12 +230,10 @@ const checkTauri = async () => {
 }
 checkTauri()
 
-const startTauriDrag = async (e: MouseEvent) => {
-  e.preventDefault()
+const startTauriDrag = async () => {
   try {
-    if (window.__TAURI__) {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window')
-      await getCurrentWindow().startDragging()
+    if (tauriGetCurrentWindow) {
+      await tauriGetCurrentWindow().startDragging()
     }
   } catch (err) {
     console.warn('Tauri drag failed:', err)
@@ -339,6 +352,12 @@ const showCharacterSettings = ref(false)
 
 // 更多菜单下拉状态
 const showMoreMenu = ref(false)
+
+const hideBackground = ref(false)
+
+const toggleBackground = () => {
+  hideBackground.value = !hideBackground.value
+}
 
 // 用户登录状态
 const isLoggedIn = ref(false)
@@ -724,6 +743,39 @@ const handleClickOutside = (e: MouseEvent) => {
 
 .pet-model-area.desktop-pet:active {
   cursor: grabbing;
+}
+
+.drag-handle {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  cursor: grab;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  transition: background 0.2s ease;
+}
+
+.drag-handle:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.drag-indicator {
+  width: 28px;
+  height: 3px;
+  border-radius: 1.5px;
+  background: rgba(0, 0, 0, 0.2);
+  transition: background 0.2s ease;
+}
+
+.drag-handle:hover .drag-indicator {
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .pet-toolbar {

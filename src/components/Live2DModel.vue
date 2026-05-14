@@ -20,6 +20,7 @@ const props = defineProps<{
   x?: number
   y?: number
   scale?: number
+  hideBackground?: boolean
 }>()
 
 const canvasContainer = ref<HTMLDivElement>()
@@ -30,6 +31,35 @@ let lastMouseX = 0
 let lastMouseY = 0
 let tickerRegistered = false
 let resizeObserver: ResizeObserver | null = null
+let backgroundDrawableIndices: number[] = []
+
+const identifyBackgroundDrawables = () => {
+  backgroundDrawableIndices = []
+  if (!model?.internalModel) return
+
+  const coreModel = (model.internalModel as any).coreModel
+  const drawables = coreModel?._model?.drawables
+  if (!drawables?.renderOrders) return
+
+  const renderOrders = Array.from(drawables.renderOrders as Float32Array)
+  if (renderOrders.length === 0) return
+
+  const minRenderOrder = Math.min(...renderOrders)
+
+  renderOrders.forEach((order, index) => {
+    if (order === minRenderOrder) {
+      backgroundDrawableIndices.push(index)
+    }
+  })
+
+  if (backgroundDrawableIndices.length > 0) {
+    console.log('Identified background drawables:', backgroundDrawableIndices.map(i => ({
+      index: i,
+      id: drawables.ids?.[i],
+      renderOrder: drawables.renderOrders?.[i]
+    })))
+  }
+}
 
 const blinkState = {
   phase: 'idle' as 'idle' | 'closing' | 'opening',
@@ -96,6 +126,8 @@ const loadModel = async () => {
     }
 
     adjustModelToContainer()
+
+    identifyBackgroundDrawables()
 
     console.log('Live2D 模型加载成功', {
       modelSize: { width: model.width, height: model.height },
@@ -182,7 +214,19 @@ const onResize = () => {
 const startRenderLoop = () => {
   if (!app) return
   app.ticker.add(() => {
-    if (app) updateBlink(app.ticker.deltaMS)
+    if (app) {
+      updateBlink(app.ticker.deltaMS)
+
+      if (props.hideBackground && model?.internalModel && backgroundDrawableIndices.length > 0) {
+        const coreModel = (model.internalModel as any).coreModel
+        const drawables = coreModel?._model?.drawables
+        if (drawables?.opacities) {
+          backgroundDrawableIndices.forEach(index => {
+            drawables.opacities[index] = 0
+          })
+        }
+      }
+    }
   })
 }
 
@@ -341,6 +385,7 @@ onUnmounted(() => {
 
 watch(() => props.modelPath, async () => {
   if (model && app) {
+    backgroundDrawableIndices = []
     app.stage.removeChild(model)
     model.destroy()
     await loadModel()
