@@ -1,5 +1,5 @@
 <template>
-  <div ref="canvasContainer" class="live2d-container"></div>
+  <div ref="canvasContainer" class="live2d-container" :class="{ 'hide-background': hideBackground }"></div>
 </template>
 
 <script setup lang="ts">
@@ -32,9 +32,11 @@ let lastMouseY = 0
 let tickerRegistered = false
 let resizeObserver: ResizeObserver | null = null
 let backgroundDrawableIndices: number[] = []
+const backgroundMeshes: any[] = []
 
 const identifyBackgroundDrawables = () => {
   backgroundDrawableIndices = []
+  backgroundMeshes.length = 0
   if (!model?.internalModel) return
 
   const coreModel = (model.internalModel as any).coreModel
@@ -44,6 +46,7 @@ const identifyBackgroundDrawables = () => {
   const renderOrders = Array.from(drawables.renderOrders as Float32Array)
   if (renderOrders.length === 0) return
 
+  // 找最小 renderOrder（背景层）
   const minRenderOrder = Math.min(...renderOrders)
 
   renderOrders.forEach((order, index) => {
@@ -52,12 +55,88 @@ const identifyBackgroundDrawables = () => {
     }
   })
 
-  console.log('=== Live2D Background Detection ===')
-  console.log('Total drawables:', renderOrders.length)
-  console.log('Min render order:', minRenderOrder)
-  console.log('Background drawable indices:', backgroundDrawableIndices)
-  console.log('Background drawable IDs:', backgroundDrawableIndices.map(i => drawables.ids?.[i]))
-  console.log('hideBackground prop:', props.hideBackground)
+  console.log('✅ 背景检测完成 - 索引:', backgroundDrawableIndices, '最小 order:', minRenderOrder)
+
+  // 尝试多种方法找到对应的 PIXI Mesh
+  // 方法1: model._meshes (一维数组)
+  const _meshes = (model as any)._meshes
+  if (_meshes && Array.isArray(_meshes)) {
+    backgroundDrawableIndices.forEach(idx => {
+      if (_meshes[idx]) {
+        backgroundMeshes.push(_meshes[idx])
+        console.log(`  通过 _meshes[${idx}] 找到 mesh`)
+      }
+    })
+  }
+
+  // 方法2: model.meshes (二维数组)
+  if (backgroundMeshes.length === 0) {
+    const meshes = (model as any).meshes
+    if (meshes && Array.isArray(meshes)) {
+      meshes.forEach((row: any) => {
+        if (Array.isArray(row)) {
+          row.forEach((mesh: any, idx: number) => {
+            if (backgroundDrawableIndices.includes(idx) && mesh) {
+              backgroundMeshes.push(mesh)
+            }
+          })
+        }
+      })
+    }
+  }
+
+  // 方法3: 遍历 model.children 找到 PIXI.Mesh（通过 geometry 属性判断）
+  if (backgroundMeshes.length === 0) {
+    const findMeshes = (container: any) => {
+      if (!container) return
+      if (container.children) {
+        container.children.forEach((child: any) => {
+          // PIXI v6 中 Mesh 对象有 geometry 和 shader 属性
+          if (child.geometry && child._texture !== undefined) {
+            const meshIdx = backgroundMeshes.length
+            if (backgroundDrawableIndices.includes(meshIdx)) {
+              backgroundMeshes.push(child)
+            }
+          }
+          findMeshes(child)
+        })
+      }
+    }
+    findMeshes(model)
+  }
+
+  console.log('找到背景 mesh 数量:', backgroundMeshes.length)
+}
+
+const applyHideBackground = (hide: boolean) => {
+  console.log('applyHideBackground:', hide, 'meshes:', backgroundMeshes.length, 'indices:', backgroundDrawableIndices)
+  
+  // 方法1: 隐藏 PIXI Mesh 对象
+  if (backgroundMeshes.length > 0) {
+    backgroundMeshes.forEach(mesh => {
+      if (mesh) {
+        mesh.visible = !hide
+        mesh.renderable = !hide
+        mesh.alpha = hide ? 0 : 1
+      }
+    })
+    console.log('  ✅ 通过 mesh.visible/alpha 隐藏')
+    return
+  }
+
+  // 方法2: 直接修改 CoreModel drawables opacities
+  if (model?.internalModel && backgroundDrawableIndices.length > 0) {
+    const coreModel = (model.internalModel as any).coreModel
+    const drawables = coreModel?._model?.drawables
+    if (drawables?.opacities) {
+      backgroundDrawableIndices.forEach(index => {
+        drawables.opacities[index] = hide ? 0 : 1
+      })
+      console.log('  ✅ 通过 drawables.opacities 隐藏')
+      return
+    }
+  }
+  console.log('  ⚠️ 没有找到可用的隐藏方法')
 }
 
 const blinkState = {
@@ -78,13 +157,20 @@ const initPixiApp = () => {
   app = new Application({
     width: width,
     height: height,
+    backgroundColor: 0x00000000,
     backgroundAlpha: 0,
     preserveDrawingBuffer: false,
     autoDensity: true,
     resolution: window.devicePixelRatio || 1,
+    transparent: true,
   })
 
-  canvasContainer.value.appendChild(app.view as HTMLCanvasElement)
+  // 强制设置 canvas 透明
+  const canvas = app.view as HTMLCanvasElement
+  canvas.style.background = 'transparent'
+  canvas.style.backgroundColor = 'transparent'
+
+  canvasContainer.value.appendChild(canvas)
 }
 
 const loadModel = async () => {
@@ -216,12 +302,14 @@ const startRenderLoop = () => {
     if (app) {
       updateBlink(app.ticker.deltaMS)
 
-      if (props.hideBackground && model?.internalModel && backgroundDrawableIndices.length > 0) {
+      // 在渲染循环中持续设置背景 opacities
+      if (model?.internalModel && backgroundDrawableIndices.length > 0) {
         const coreModel = (model.internalModel as any).coreModel
         const drawables = coreModel?._model?.drawables
         if (drawables?.opacities) {
+          const targetOpacity = props.hideBackground ? 0 : 1
           backgroundDrawableIndices.forEach(index => {
-            drawables.opacities[index] = 0
+            drawables.opacities[index] = targetOpacity
           })
         }
       }
@@ -231,6 +319,7 @@ const startRenderLoop = () => {
 
 watch(() => props.hideBackground, (val) => {
   console.log('hideBackground changed to:', val, 'backgroundDrawableIndices:', backgroundDrawableIndices)
+  applyHideBackground(val)
 })
 
 const playMotion = (group: string, index = 0) => {
@@ -389,6 +478,7 @@ onUnmounted(() => {
 watch(() => props.modelPath, async () => {
   if (model && app) {
     backgroundDrawableIndices = []
+    backgroundMeshes.length = 0
     app.stage.removeChild(model)
     model.destroy()
     await loadModel()
@@ -408,5 +498,13 @@ watch(() => props.modelPath, async () => {
   width: 100% !important;
   height: 100% !important;
   background: transparent;
+}
+
+.live2d-container.hide-background {
+  background: transparent !important;
+}
+
+.live2d-container.hide-background canvas {
+  background: transparent !important;
 }
 </style>

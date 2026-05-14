@@ -109,7 +109,11 @@ live2d/
 - **Windows**: Microsoft Visual Studio C++ Build Tools + WebView2
 - **Linux**: libwebkit2gtk-4.0-dev, libgtk-3-dev, libayatana-dev
 
-### 1. 安装依赖
+### 1、安装rust
+
+[rustup.rs - Rust 工具链安装器](https://rustup.rs/?spm=5176.28103460.0.0.1bca2988qYpY1H)
+
+### 2、 安装依赖
 
 ```bash
 npm install

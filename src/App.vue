@@ -1,5 +1,5 @@
 <template>
-  <div class="app-container desktop-pet">
+  <div class="app-container desktop-pet" :class="{ 'background-hidden': hideBackground }">
     <ChatWindow
       v-if="showChat"
       :ws-url="wsConfig.baseUrl"
@@ -36,8 +36,8 @@
       @saved="handleCharacterSaved"
     />
 
-    <div v-if="discoveredModels.length > 0" class="pet-container desktop-pet">
-      <div class="pet-model-area desktop-pet">
+    <div v-if="discoveredModels.length > 0" class="pet-container desktop-pet" :class="{ 'background-hidden': hideBackground }">
+      <div class="pet-model-area desktop-pet" :class="{ 'background-hidden': hideBackground }">
         <div class="drag-handle" @mousedown="handleDragStart" title="拖拽移动窗口">
           <div class="drag-indicator"></div>
         </div>
@@ -321,6 +321,30 @@ const hideBackground = ref(false)
 
 const toggleBackground = () => {
   hideBackground.value = !hideBackground.value
+  
+  // 直接操作 DOM 元素的 inline style，优先级最高（不受 CSS 顺序影响）
+  const modelArea = document.querySelector('.pet-model-area') as HTMLElement | null
+  const petContainer = document.querySelector('.pet-container') as HTMLElement | null
+  
+  if (hideBackground.value) {
+    modelArea?.style.setProperty('background', 'transparent', 'important')
+    modelArea?.style.setProperty('background-image', 'none', 'important')
+    modelArea?.style.setProperty('box-shadow', 'none', 'important')
+    modelArea?.style.setProperty('border', 'none', 'important')
+    modelArea?.style.setProperty('border-radius', '0', 'important')
+    petContainer?.style.setProperty('background', 'transparent', 'important')
+    petContainer?.style.setProperty('background-image', 'none', 'important')
+    console.log('✅ 背景已隐藏')
+  } else {
+    modelArea?.style.removeProperty('background')
+    modelArea?.style.removeProperty('background-image')
+    modelArea?.style.removeProperty('box-shadow')
+    modelArea?.style.removeProperty('border')
+    modelArea?.style.removeProperty('border-radius')
+    petContainer?.style.removeProperty('background')
+    petContainer?.style.removeProperty('background-image')
+    console.log('✅ 背景已显示')
+  }
 }
 
 // 用户登录状态
@@ -684,6 +708,15 @@ const handleClickOutside = (e: MouseEvent) => {
   background: transparent !important;
 }
 
+.app-container.desktop-pet.background-hidden {
+  background: transparent !important;
+  backdrop-filter: none !important;
+}
+
+.pet-container.desktop-pet.background-hidden {
+  background: transparent !important;
+}
+
 .loading-tip {
   position: fixed;
   top: 50%;
@@ -738,12 +771,25 @@ const handleClickOutside = (e: MouseEvent) => {
   border-radius: 20px 20px 0 0;
 }
 
+.pet-model-area.background-hidden {
+  background: transparent !important;
+}
+
 .pet-model-area.desktop-pet {
   flex: 1;
   width: 100vw;
   height: auto;
   background: transparent !important;
   cursor: default;
+}
+
+.pet-model-area.desktop-pet.background-hidden {
+  background: transparent !important;
+  opacity: 1;
+}
+
+.pet-model-area.desktop-pet.background-hidden::before {
+  display: none;
 }
 
 .pet-model-area.desktop-pet:active {
