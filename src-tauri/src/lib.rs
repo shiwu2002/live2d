@@ -6,11 +6,16 @@ pub fn run() {
     .setup(|app| {
       use tauri::window::Color;
 
-      // 在窗口创建时就设置透明背景，确保原生层透明
       if let Some(window) = app.get_webview_window("main") {
-        // 同时设置 window 和 webview 的背景色
-        // macOS: window 层生效，webview 层调用虽然无效但无害
         let _ = window.set_background_color(Some(Color(0, 0, 0, 0)));
+
+        #[cfg(target_os = "windows")]
+        {
+          use tauri::Manager;
+          if let Some(win) = app.get_webview_window("main") {
+            let _ = win.set_decorations(false);
+          }
+        }
       }
 
       if cfg!(debug_assertions) {

@@ -1,5 +1,5 @@
 <template>
-  <div class="app-container desktop-pet" :class="{ 'background-hidden': hideBackground }">
+  <div class="app-container desktop-pet">
     <ChatWindow
       v-if="showChat"
       :ws-url="wsConfig.baseUrl"
@@ -36,8 +36,8 @@
       @saved="handleCharacterSaved"
     />
 
-    <div v-if="discoveredModels.length > 0" class="pet-container desktop-pet" :class="{ 'background-hidden': hideBackground }">
-      <div class="pet-model-area desktop-pet" :class="{ 'background-hidden': hideBackground }">
+    <div v-if="discoveredModels.length > 0" class="pet-container desktop-pet">
+      <div class="pet-model-area desktop-pet">
         <div class="drag-handle" @mousedown="handleDragStart" title="拖拽移动窗口">
           <div class="drag-indicator"></div>
         </div>
@@ -49,7 +49,6 @@
           :modelId="currentModel"
           :width="widgetWidth"
           :height="widgetHeight"
-          :hideBackground="hideBackground"
         />
       </div>
 
@@ -133,14 +132,6 @@
               >
                 <span class="dropdown-emoji">😊</span>
                 <span>随机表情</span>
-              </button>
-              <button
-                class="dropdown-item"
-                @click="toggleBackground(); showMoreMenu = false"
-                :title="hideBackground ? '显示背景' : '隐藏背景'"
-              >
-                <span class="dropdown-emoji">🖼️</span>
-                <span>{{ hideBackground ? '显示背景' : '隐藏背景' }}</span>
               </button>
               <div class="dropdown-divider"></div>
               <button
@@ -316,41 +307,6 @@ const showCharacterSettings = ref(false)
 
 // 更多菜单下拉状态
 const showMoreMenu = ref(false)
-
-const hideBackground = ref(false)
-
-const toggleBackground = () => {
-  hideBackground.value = !hideBackground.value
-
-  const modelArea = document.querySelector('.pet-model-area') as HTMLElement | null
-  const petContainer = document.querySelector('.pet-container') as HTMLElement | null
-  const toolbar = document.querySelector('.pet-toolbar') as HTMLElement | null
-  const dragHandle = document.querySelector('.drag-handle') as HTMLElement | null
-
-  if (hideBackground.value) {
-    const targets = [modelArea, petContainer, toolbar, dragHandle].filter(Boolean) as HTMLElement[]
-    targets.forEach(el => {
-      el.style.setProperty('background', 'transparent', 'important')
-      el.style.setProperty('background-image', 'none', 'important')
-      el.style.setProperty('box-shadow', 'none', 'important')
-      el.style.setProperty('border', 'none', 'important')
-      el.style.setProperty('border-radius', '0', 'important')
-      el.style.setProperty('backdrop-filter', 'none', 'important')
-    })
-    console.log('✅ 背景已隐藏')
-  } else {
-    const targets = [modelArea, petContainer, toolbar, dragHandle].filter(Boolean) as HTMLElement[]
-    targets.forEach(el => {
-      el.style.removeProperty('background')
-      el.style.removeProperty('background-image')
-      el.style.removeProperty('box-shadow')
-      el.style.removeProperty('border')
-      el.style.removeProperty('border-radius')
-      el.style.removeProperty('backdrop-filter')
-    })
-    console.log('✅ 背景已显示')
-  }
-}
 
 // 用户登录状态
 const isLoggedIn = ref(false)
@@ -728,15 +684,6 @@ const handleClickOutside = (e: MouseEvent) => {
   background: transparent !important;
 }
 
-.app-container.desktop-pet.background-hidden {
-  background: transparent !important;
-  backdrop-filter: none !important;
-}
-
-.pet-container.desktop-pet.background-hidden {
-  background: transparent !important;
-}
-
 .loading-tip {
   position: fixed;
   top: 50%;
@@ -791,10 +738,6 @@ const handleClickOutside = (e: MouseEvent) => {
   border-radius: 20px 20px 0 0;
 }
 
-.pet-model-area.background-hidden {
-  background: transparent !important;
-}
-
 .pet-model-area.desktop-pet {
   flex: 1;
   width: 100vw;
@@ -803,16 +746,6 @@ const handleClickOutside = (e: MouseEvent) => {
   background-color: transparent !important;
   background-image: none !important;
   cursor: default;
-}
-
-.pet-model-area.desktop-pet.background-hidden {
-  background: transparent !important;
-  background-color: transparent !important;
-  opacity: 1;
-}
-
-.pet-model-area.desktop-pet.background-hidden::before {
-  display: none;
 }
 
 .pet-model-area.desktop-pet:active {
@@ -876,34 +809,6 @@ const handleClickOutside = (e: MouseEvent) => {
   opacity: 0.3;
   transition: opacity 0.3s ease;
   -webkit-app-region: no-drag;
-}
-
-.background-hidden .pet-toolbar.desktop-pet {
-  background: transparent !important;
-  backdrop-filter: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  opacity: 0.15;
-}
-
-.background-hidden .pet-toolbar.desktop-pet:hover {
-  opacity: 0.6;
-  background: rgba(255, 255, 255, 0.3) !important;
-  backdrop-filter: blur(4px) !important;
-}
-
-.background-hidden .drag-handle {
-  background: transparent !important;
-  backdrop-filter: none !important;
-  opacity: 0.15;
-}
-
-.background-hidden .drag-handle:hover {
-  opacity: 0.5;
-}
-
-.background-hidden .drag-indicator {
-  background: rgba(255, 255, 255, 0.4);
 }
 
 .pet-toolbar.desktop-pet * {
