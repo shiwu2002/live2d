@@ -34,42 +34,169 @@ let resizeObserver: ResizeObserver | null = null
 let backgroundDrawableIndices: number[] = []
 const backgroundMeshes: any[] = []
 
+// 收集 PIXI 场景图中所有 Mesh 对象（平铺遍历，不预先绑定 drawable 索引）
+const allSceneMeshes: any[] = []
+
+const collectAllSceneMeshes = () => {
+  allSceneMeshes.length = 0
+  if (!model) return
+
+  const walk = (node: any, depth: number, path: string) => {
+    if (!node) return
+    if (node.children && Array.isArray(node.children)) {
+      node.children.forEach((child: any, i: number) => {
+        const childPath = `${path}/${i}`
+        // PIXI Mesh 的判断：有 geometry 属性
+        if (child.geometry && child.visible !== undefined) {
+          allSceneMeshes.push({ mesh: child, depth, path: childPath, childIndex: i })
+        }
+        // 无论是否为 Mesh，都继续递归（Container 也可能包含子节点）
+        walk(child, depth + 1, childPath)
+      })
+    }
+  }
+  walk(model, 0, 'root')
+  console.log(`🔍 场景图中共找到 ${allSceneMeshes.length} 个 Mesh`)
+}
+
 const identifyBackgroundDrawables = () => {
   backgroundDrawableIndices = []
   backgroundMeshes.length = 0
   if (!model?.internalModel) return
 
+  // 首先收集场景图中所有 Mesh
+  collectAllSceneMeshes()
+
   const coreModel = (model.internalModel as any).coreModel
   const drawables = coreModel?._model?.drawables
-  if (!drawables?.renderOrders) return
+  if (!drawables?.renderOrders) {
+    // 没有 drawable 数据时，用场景图中深度最大的 mesh 作为背景候选
+    if (allSceneMeshes.length > 0) {
+      const sorted = [...allSceneMeshes].sort((a, b) => b.depth - a.depth)
+      const candidates = sorted.slice(0, Math.max(1, Math.ceil(sorted.length * 0.3)))
+      candidates.forEach(item => backgroundMeshes.push(item.mesh))
+      console.log('⚠️ 回退: 场景图深度推断背景, 候选数:', backgroundMeshes.length)
+    }
+    return
+  }
 
-  const renderOrders = Array.from(drawables.renderOrders as Float32Array)
-  if (renderOrders.length === 0) return
+  const renderOrders: number[] = Array.from(drawables.renderOrders as Float32Array)
+  console.log('📊 Drawables 总数:', renderOrders.length, '场景Mesh数:', allSceneMeshes.length)
 
-  // 找最小 renderOrder（背景层）
-  const minRenderOrder = Math.min(...renderOrders)
+  // 获取纹理 URL 用于检测
+  const textureUrls: string[] = []
+  try {
+    const settings = (model.internalModel as any).settings
+    if (settings?.textures) {
+      settings.textures.forEach((t: any) => textureUrls.push(String(t || '')))
+    }
+  } catch { /* ignore */ }
+  console.log('🖼️ 纹理 URL:', textureUrls)
 
-  renderOrders.forEach((order, index) => {
-    if (order === minRenderOrder) {
-      backgroundDrawableIndices.push(index)
+  // 策略1: 纹理名匹配关键词
+  const bgTextureSet = new Set<number>()
+  textureUrls.forEach((url, idx) => {
+    const lower = url.toLowerCase()
+    if (/background|_bg_|_bg\.|bg_|back_|haikei|scene|stage/i.test(lower)) {
+      bgTextureSet.add(idx)
     }
   })
 
-  console.log('✅ 背景检测完成 - 索引:', backgroundDrawableIndices, '最小 order:', minRenderOrder)
+  if (bgTextureSet.size > 0) {
+    const textures = drawables.textureIndexes as Int16Array | undefined
+    if (textures) {
+      Array.from(textures).forEach((texIdx, drawIdx) => {
+        if (bgTextureSet.has(texIdx)) backgroundDrawableIndices.push(drawIdx)
+      })
+    }
+    console.log('✅ 背景检测(纹理名) - 索引:', backgroundDrawableIndices)
+  }
 
-  // 尝试多种方法找到对应的 PIXI Mesh
-  // 方法1: model._meshes (一维数组)
+  // 策略2: 基于场景图 — 大面积 mesh 通常是背景
+  if (backgroundDrawableIndices.length === 0 && allSceneMeshes.length > 0) {
+    const canvasW = app?.screen.width ?? 0
+    const canvasH = app?.screen.height ?? 0
+    const totalArea = canvasW * canvasH
+
+    const meshInfos: Array<{ idx: number; areaRatio: number; depth: number; path: string }> = []
+    allSceneMeshes.forEach((item, idx) => {
+      const m = item.mesh
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+      try {
+        const posBuf = m.geometry?.getBuffer('aVertexPosition')
+        if (posBuf?.data) {
+          const arr = posBuf.data as Float32Array
+          for (let i = 0; i < arr.length; i += 2) {
+            const vx = arr[i] as number
+            const vy = arr[i + 1] as number
+            if (vx !== undefined && vy !== undefined) {
+              if (vx < minX) minX = vx
+              if (vx > maxX) maxX = vx
+              if (vy < minY) minY = vy
+              if (vy > maxY) maxY = vy
+            }
+          }
+        }
+      } catch { /* skip malformed geometry */ }
+      const w = maxX - minX
+      const h = maxY - minY
+      const area = w * h
+      const areaRatio = totalArea > 0 ? area / totalArea : 0
+      if (area > 0) {
+        meshInfos.push({ idx, areaRatio, depth: item.depth, path: item.path })
+      }
+    })
+
+    console.log('📐 Mesh 包围盒分析 (前10):',
+      meshInfos.slice(0, 10).map(i => ({
+        idx: i.idx, areaRatio: (i.areaRatio * 100).toFixed(1) + '%',
+        depth: i.depth, path: i.path
+      }))
+    )
+
+    // 背景 mesh 覆盖面积大（>40%画布）
+    meshInfos.forEach(info => {
+      if (info.areaRatio > 0.4) {
+        backgroundMeshes.push(allSceneMeshes[info.idx].mesh)
+      }
+    })
+
+    if (backgroundMeshes.length > 0) {
+      console.log('✅ 背景检测(大面积Mesh) - 数量:', backgroundMeshes.length)
+    }
+  }
+
+  // 策略3: renderOrder 最低的 drawable
+  if (backgroundDrawableIndices.length === 0 && backgroundMeshes.length === 0) {
+    const minOrder = Math.min(...renderOrders)
+    renderOrders.forEach((order, index) => {
+      if (order === minOrder) backgroundDrawableIndices.push(index)
+    })
+    console.log('✅ 背景检测(renderOrder) - 索引:', backgroundDrawableIndices, '最小 order:', minOrder)
+  }
+
+  // 策略4: renderOrder 最低的 20%
+  if (backgroundDrawableIndices.length === 0 && backgroundMeshes.length === 0) {
+    const sorted = renderOrders.map((order, idx) => ({ order, idx })).sort((a, b) => a.order - b.order)
+    const cutoff = Math.max(1, Math.floor(renderOrders.length * 0.2))
+    sorted.slice(0, cutoff).forEach(({ idx }) => backgroundDrawableIndices.push(idx))
+    console.log('⚠️ 背景检测(top 20%) - 索引:', backgroundDrawableIndices)
+  }
+
+  // 如果在场景图中找到了 backgroundMeshes，直接使用
+  if (backgroundMeshes.length > 0) {
+    console.log('🎯 背景检测(large area meshes) - mesh数量:', backgroundMeshes.length)
+    return
+  }
+
+  // 尝试通过 drawable 索引匹配 PIXI Mesh（多种途径）
   const _meshes = (model as any)._meshes
   if (_meshes && Array.isArray(_meshes)) {
     backgroundDrawableIndices.forEach(idx => {
-      if (_meshes[idx]) {
-        backgroundMeshes.push(_meshes[idx])
-        console.log(`  通过 _meshes[${idx}] 找到 mesh`)
-      }
+      if (_meshes[idx]) backgroundMeshes.push(_meshes[idx])
     })
   }
 
-  // 方法2: model.meshes (二维数组)
   if (backgroundMeshes.length === 0) {
     const meshes = (model as any).meshes
     if (meshes && Array.isArray(meshes)) {
@@ -85,33 +212,22 @@ const identifyBackgroundDrawables = () => {
     }
   }
 
-  // 方法3: 遍历 model.children 找到 PIXI.Mesh（通过 geometry 属性判断）
-  if (backgroundMeshes.length === 0) {
-    const findMeshes = (container: any) => {
-      if (!container) return
-      if (container.children) {
-        container.children.forEach((child: any) => {
-          // PIXI v6 中 Mesh 对象有 geometry 和 shader 属性
-          if (child.geometry && child._texture !== undefined) {
-            const meshIdx = backgroundMeshes.length
-            if (backgroundDrawableIndices.includes(meshIdx)) {
-              backgroundMeshes.push(child)
-            }
-          }
-          findMeshes(child)
-        })
+  // 用场景图 mesh 按索引匹配
+  if (backgroundMeshes.length === 0 && allSceneMeshes.length > 0) {
+    backgroundDrawableIndices.forEach(idx => {
+      if (idx < allSceneMeshes.length) {
+        backgroundMeshes.push(allSceneMeshes[idx].mesh)
       }
-    }
-    findMeshes(model)
+    })
   }
 
-  console.log('找到背景 mesh 数量:', backgroundMeshes.length)
+  console.log('🎯 背景检测最终结果 - drawable索引:', backgroundDrawableIndices, 'mesh数量:', backgroundMeshes.length)
 }
 
 const applyHideBackground = (hide: boolean) => {
   console.log('applyHideBackground:', hide, 'meshes:', backgroundMeshes.length, 'indices:', backgroundDrawableIndices)
-  
-  // 方法1: 隐藏 PIXI Mesh 对象
+
+  // 方法1: 直接隐藏已找到的 PIXI Mesh
   if (backgroundMeshes.length > 0) {
     backgroundMeshes.forEach(mesh => {
       if (mesh) {
@@ -120,11 +236,27 @@ const applyHideBackground = (hide: boolean) => {
         mesh.alpha = hide ? 0 : 1
       }
     })
-    console.log('  ✅ 通过 mesh.visible/alpha 隐藏')
+    console.log('  ✅ 通过 mesh.visible/alpha 隐藏了', backgroundMeshes.length, '个 mesh')
     return
   }
 
-  // 方法2: 直接修改 CoreModel drawables opacities
+  // 方法2: 如果没找到特定 mesh，尝试隐藏场景图中前几个 mesh（可能是背景层）
+  if (allSceneMeshes.length > 0) {
+    // 隐藏深度最大的几个 mesh（它们最先被渲染，可能是背景）
+    const sorted = [...allSceneMeshes].sort((a, b) => b.depth - a.depth)
+    const candidates = sorted.slice(0, Math.ceil(sorted.length * 0.3))
+    candidates.forEach(({ mesh }) => {
+      if (mesh) {
+        mesh.visible = !hide
+        mesh.renderable = !hide
+        mesh.alpha = hide ? 0 : 1
+      }
+    })
+    console.log('  ✅ 通过场景图深度隐藏了', candidates.length, '个 mesh (共', allSceneMeshes.length, '个)')
+    return
+  }
+
+  // 方法3: 设置 drawables opacities
   if (model?.internalModel && backgroundDrawableIndices.length > 0) {
     const coreModel = (model.internalModel as any).coreModel
     const drawables = coreModel?._model?.drawables
@@ -302,14 +434,29 @@ const startRenderLoop = () => {
     if (app) {
       updateBlink(app.ticker.deltaMS)
 
-      // 在渲染循环中持续设置背景 opacities
+      // 每帧确保背景 mesh/opacity 保持目标状态
+      if (!props.hideBackground) return
+
+      // 保持 PIXI mesh 隐藏
+      if (backgroundMeshes.length > 0) {
+        backgroundMeshes.forEach(mesh => {
+          if (mesh && mesh.visible !== false) {
+            mesh.visible = false
+            mesh.renderable = false
+            mesh.alpha = 0
+          }
+        })
+      }
+
+      // 兜底: 保持 drawable opacities
       if (model?.internalModel && backgroundDrawableIndices.length > 0) {
         const coreModel = (model.internalModel as any).coreModel
         const drawables = coreModel?._model?.drawables
         if (drawables?.opacities) {
-          const targetOpacity = props.hideBackground ? 0 : 1
           backgroundDrawableIndices.forEach(index => {
-            drawables.opacities[index] = targetOpacity
+            if (drawables.opacities[index] !== 0) {
+              drawables.opacities[index] = 0
+            }
           })
         }
       }

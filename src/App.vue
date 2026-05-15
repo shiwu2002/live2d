@@ -321,28 +321,33 @@ const hideBackground = ref(false)
 
 const toggleBackground = () => {
   hideBackground.value = !hideBackground.value
-  
-  // 直接操作 DOM 元素的 inline style，优先级最高（不受 CSS 顺序影响）
+
   const modelArea = document.querySelector('.pet-model-area') as HTMLElement | null
   const petContainer = document.querySelector('.pet-container') as HTMLElement | null
-  
+  const toolbar = document.querySelector('.pet-toolbar') as HTMLElement | null
+  const dragHandle = document.querySelector('.drag-handle') as HTMLElement | null
+
   if (hideBackground.value) {
-    modelArea?.style.setProperty('background', 'transparent', 'important')
-    modelArea?.style.setProperty('background-image', 'none', 'important')
-    modelArea?.style.setProperty('box-shadow', 'none', 'important')
-    modelArea?.style.setProperty('border', 'none', 'important')
-    modelArea?.style.setProperty('border-radius', '0', 'important')
-    petContainer?.style.setProperty('background', 'transparent', 'important')
-    petContainer?.style.setProperty('background-image', 'none', 'important')
+    const targets = [modelArea, petContainer, toolbar, dragHandle].filter(Boolean) as HTMLElement[]
+    targets.forEach(el => {
+      el.style.setProperty('background', 'transparent', 'important')
+      el.style.setProperty('background-image', 'none', 'important')
+      el.style.setProperty('box-shadow', 'none', 'important')
+      el.style.setProperty('border', 'none', 'important')
+      el.style.setProperty('border-radius', '0', 'important')
+      el.style.setProperty('backdrop-filter', 'none', 'important')
+    })
     console.log('✅ 背景已隐藏')
   } else {
-    modelArea?.style.removeProperty('background')
-    modelArea?.style.removeProperty('background-image')
-    modelArea?.style.removeProperty('box-shadow')
-    modelArea?.style.removeProperty('border')
-    modelArea?.style.removeProperty('border-radius')
-    petContainer?.style.removeProperty('background')
-    petContainer?.style.removeProperty('background-image')
+    const targets = [modelArea, petContainer, toolbar, dragHandle].filter(Boolean) as HTMLElement[]
+    targets.forEach(el => {
+      el.style.removeProperty('background')
+      el.style.removeProperty('background-image')
+      el.style.removeProperty('box-shadow')
+      el.style.removeProperty('border')
+      el.style.removeProperty('border-radius')
+      el.style.removeProperty('backdrop-filter')
+    })
     console.log('✅ 背景已显示')
   }
 }
@@ -646,6 +651,32 @@ onMounted(async () => {
   ;(async () => {
     console.log('=== STARTING TRANSPARENCY SETUP ===')
 
+    const style = document.createElement('style')
+    style.id = 'force-transparent-styles'
+    style.textContent = `
+      html, body, #app,
+      .app-container, .pet-container, .pet-model-area,
+      .live2d-container, canvas,
+      .app-container.desktop-pet,
+      .pet-container.desktop-pet,
+      .pet-model-area.desktop-pet {
+        background: transparent !important;
+        background-color: #00000000 !important;
+        background-image: none !important;
+        backdrop-filter: none !important;
+      }
+
+      /* 确保所有可能的背景元素都透明 */
+      .desktop-pet {
+        background: transparent !important;
+        background-color: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
+      }
+    `
+    document.head.appendChild(style)
+    console.log('✅ Injected force-transparent styles')
+
     try {
       const { getCurrentWebview } = await import('@tauri-apps/api/webview')
       const wv = getCurrentWebview()
@@ -666,17 +697,6 @@ onMounted(async () => {
       console.warn('⚠️ Window setBackgroundColor failed:', e)
     }
 
-    const style = document.createElement('style')
-    style.textContent = `
-      html, body, #app,
-      .app-container, .pet-container, .pet-model-area,
-      .live2d-container, canvas {
-        background: transparent !important;
-        background-color: transparent !important;
-      }
-    `
-    document.head.appendChild(style)
-    console.log('✅ Injected force-transparent styles')
     console.log('=== TRANSPARENCY SETUP DONE ===')
   })()
 })
@@ -780,11 +800,14 @@ const handleClickOutside = (e: MouseEvent) => {
   width: 100vw;
   height: auto;
   background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
   cursor: default;
 }
 
 .pet-model-area.desktop-pet.background-hidden {
   background: transparent !important;
+  background-color: transparent !important;
   opacity: 1;
 }
 
@@ -853,6 +876,34 @@ const handleClickOutside = (e: MouseEvent) => {
   opacity: 0.3;
   transition: opacity 0.3s ease;
   -webkit-app-region: no-drag;
+}
+
+.background-hidden .pet-toolbar.desktop-pet {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  opacity: 0.15;
+}
+
+.background-hidden .pet-toolbar.desktop-pet:hover {
+  opacity: 0.6;
+  background: rgba(255, 255, 255, 0.3) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+.background-hidden .drag-handle {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  opacity: 0.15;
+}
+
+.background-hidden .drag-handle:hover {
+  opacity: 0.5;
+}
+
+.background-hidden .drag-indicator {
+  background: rgba(255, 255, 255, 0.4);
 }
 
 .pet-toolbar.desktop-pet * {
