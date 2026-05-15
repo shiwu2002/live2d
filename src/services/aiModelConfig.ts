@@ -99,6 +99,30 @@ export interface VendorStatus {
   healthy: boolean
 }
 
+// 用户自定义模型
+export interface UserCustomModel {
+  id?: number
+  userId: string
+  modelName: string
+  protocolType: string
+  baseUrl: string
+  modelId: string
+  apiKey: string
+  maxTokens?: number
+  temperature?: number
+  isDefault?: boolean
+  status?: number
+  createTime?: string
+  updateTime?: string
+  fullIdentifier?: string
+}
+
+// 展示列表中的自定义模型（来自 display-with-custom API）
+export interface CustomModelDisplayInfo extends ModelConfig {
+  isCustomModel: boolean
+  customModelId?: number
+}
+
 // 切换响应
 export interface SwitchResponse {
   success: boolean
@@ -431,6 +455,145 @@ export class AiModelConfigService {
     } catch (error) {
       console.error('获取协议健康状态错误:', error)
       return []
+    }
+  }
+
+  /**
+   * 获取用户可用模型（含自定义模型）
+   */
+  async getDisplayModelsWithCustom(userId: string): Promise<CustomModelDisplayInfo[]> {
+    try {
+      const response = await this.fetchWithAuth(
+        `${this.baseUrl}/api/ai-model-config/display-with-custom?userId=${encodeURIComponent(userId)}`
+      )
+      const result: ApiResponse<CustomModelDisplayInfo[]> = await response.json()
+
+      if (result.code === 200) {
+        return result.data
+      } else {
+        console.error('获取用户自定义模型列表失败:', result.message)
+        return []
+      }
+    } catch (error) {
+      console.error('获取用户自定义模型列表错误:', error)
+      return []
+    }
+  }
+
+  /**
+   * 获取用户自定义模型列表
+   */
+  async getUserCustomModels(userId: string): Promise<Map<string, any>[]> {
+    try {
+      const response = await this.fetchWithAuth(
+        `${this.baseUrl}/api/custom-model/list?userId=${encodeURIComponent(userId)}`
+      )
+      const result: ApiResponse<Map<string, any>[]> = await response.json()
+
+      if (result.code === 200) {
+        return result.data
+      } else {
+        console.error('获取自定义模型列表失败:', result.message)
+        return []
+      }
+    } catch (error) {
+      console.error('获取自定义模型列表错误:', error)
+      return []
+    }
+  }
+
+  /**
+   * 创建用户自定义模型
+   */
+  async createCustomModel(model: UserCustomModel): Promise<any | null> {
+    try {
+      const response = await this.fetchWithAuth(`${this.baseUrl}/api/custom-model/create`, {
+        method: 'POST',
+        body: JSON.stringify(model)
+      })
+      const result: ApiResponse<any> = await response.json()
+
+      if (result.code === 200) {
+        return result.data
+      } else {
+        console.error('创建自定义模型失败:', result.message)
+        return null
+      }
+    } catch (error) {
+      console.error('创建自定义模型错误:', error)
+      return null
+    }
+  }
+
+  /**
+   * 更新用户自定义模型
+   */
+  async updateCustomModel(id: number, userId: string, model: UserCustomModel): Promise<any | null> {
+    try {
+      const response = await this.fetchWithAuth(
+        `${this.baseUrl}/api/custom-model/update/${id}?userId=${encodeURIComponent(userId)}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(model)
+        }
+      )
+      const result: ApiResponse<any> = await response.json()
+
+      if (result.code === 200) {
+        return result.data
+      } else {
+        console.error('更新自定义模型失败:', result.message)
+        return null
+      }
+    } catch (error) {
+      console.error('更新自定义模型错误:', error)
+      return null
+    }
+  }
+
+  /**
+   * 删除用户自定义模型
+   */
+  async deleteCustomModel(id: number, userId: string): Promise<boolean> {
+    try {
+      const response = await this.fetchWithAuth(
+        `${this.baseUrl}/api/custom-model/delete/${id}?userId=${encodeURIComponent(userId)}`,
+        { method: 'DELETE' }
+      )
+      const result: ApiResponse<any> = await response.json()
+
+      if (result.code === 200) {
+        return true
+      } else {
+        console.error('删除自定义模型失败:', result.message)
+        return false
+      }
+    } catch (error) {
+      console.error('删除自定义模型错误:', error)
+      return false
+    }
+  }
+
+  /**
+   * 设置默认自定义模型
+   */
+  async setDefaultCustomModel(id: number, userId: string): Promise<boolean> {
+    try {
+      const response = await this.fetchWithAuth(
+        `${this.baseUrl}/api/custom-model/set-default/${id}?userId=${encodeURIComponent(userId)}`,
+        { method: 'POST' }
+      )
+      const result: ApiResponse<any> = await response.json()
+
+      if (result.code === 200) {
+        return true
+      } else {
+        console.error('设置默认模型失败:', result.message)
+        return false
+      }
+    } catch (error) {
+      console.error('设置默认模型错误:', error)
+      return false
     }
   }
 

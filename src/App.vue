@@ -36,6 +36,13 @@
       @saved="handleCharacterSaved"
     />
 
+    <CustomModelManager
+      :visible="showCustomModelManager"
+      :userId="currentUser?.openid || ''"
+      @close="showCustomModelManager = false"
+      @changed="handleCustomModelsChanged"
+    />
+
     <div v-if="discoveredModels.length > 0" class="pet-container desktop-pet">
       <div class="pet-model-area desktop-pet">
         <div class="drag-handle" @mousedown="handleDragStart" title="拖拽移动窗口">
@@ -102,7 +109,7 @@
                     {{ aiModelsLoading ? '加载中...' : (isSavingPreference ? '保存中...' : (isLoggedIn ? '选择 AI 模型' : '请先登录')) }}
                   </option>
                   <option v-for="model in aiModels" :key="model.fullIdentifier" :value="model.fullIdentifier">
-                    {{ model.protocolName }} - {{ model.modelName }}{{ model.isDefault ? ' ★' : '' }}
+                    {{ (model as any).isCustomModel ? '🔧 ' : '' }}{{ model.protocolName }} - {{ model.modelName }}{{ model.isDefault ? ' ★' : '' }}
                   </option>
                 </select>
               </div>
@@ -116,6 +123,15 @@
               >
                 <img :src="iconCharacter" alt="角色设置" class="dropdown-icon" />
                 <span>角色设置</span>
+              </button>
+              <button
+                class="dropdown-item"
+                @click="toggleCustomModelManager(); showMoreMenu = false"
+                :style="!isLoggedIn ? 'opacity:0.4' : ''"
+                title="自定义模型"
+              >
+                <span class="dropdown-emoji">🔧</span>
+                <span>自定义模型</span>
               </button>
               <button
                 class="dropdown-item"
@@ -187,6 +203,7 @@ import ChatWindow from './components/ChatWindow.vue'
 import VoiceCall from './components/VoiceCall.vue'
 import UserAuthModal from './components/UserAuthModal.vue'
 import CharacterSettings from './components/CharacterSettings.vue'
+import CustomModelManager from './components/CustomModelManager.vue'
 import { autoModelConfig, getAutoModelIds } from './config/auto-models'
 import { getChatConfig, generateSessionId } from './config'
 import { getWebSocketUrl, logEnvConfig } from './config'
@@ -307,6 +324,9 @@ const showUserAuthModal = ref(false)
 // 角色设置窗口状态
 const showCharacterSettings = ref(false)
 
+// 自定义模型管理窗口状态
+const showCustomModelManager = ref(false)
+
 // 更多菜单下拉状态
 const showMoreMenu = ref(false)
 
@@ -397,6 +417,20 @@ const handleCharacterSaved = (character: any) => {
   showMessage('角色设置已保存', 'success')
 }
 
+// 切换自定义模型管理窗口
+const toggleCustomModelManager = () => {
+  if (!isLoggedIn.value) {
+    showMessage('请先登录', 'error')
+    return
+  }
+  showCustomModelManager.value = !showCustomModelManager.value
+}
+
+// 自定义模型变更回调
+const handleCustomModelsChanged = () => {
+  loadAiModels()
+}
+
 
 
 // 处理用户名密码登录成功
@@ -464,8 +498,8 @@ const loadAiModels = async () => {
 
   aiModelsLoading.value = true
   try {
-    // 使用 display API 获取模型列表，并合并健康状态
-    const models = await aiModelConfigService.getDisplayModelsWithHealth()
+    // 使用 display-with-custom API 获取模型列表（含用户自定义模型）
+    const models = await aiModelConfigService.getDisplayModelsWithCustom(currentUser.value.openid)
     aiModels.value = models
 
     // 尝试加载用户的偏好设置
