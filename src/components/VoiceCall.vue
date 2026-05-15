@@ -1,102 +1,43 @@
 <template>
-  <div class="voice-call-container" v-if="visible">
-    <div class="voice-call-modal">
-      <!-- 关闭按钮 -->
-      <button class="close-btn-top" @click="handleClose" title="关闭">
-        <span>✕</span>
-      </button>
-
-      <!-- 主内容区 -->
-      <div class="call-content">
-        <!-- 头像和波纹效果 -->
-        <div class="avatar-section">
-          <div class="avatar-container" :class="stateClass">
-            <!-- 波纹动画层 -->
-            <div class="ripple-effect" v-if="isInCall && callState !== 'error'">
-              <div class="ripple"></div>
-              <div class="ripple"></div>
-              <div class="ripple"></div>
-            </div>
-            
-            <!-- 头像 -->
-            <div class="avatar-circle">
-              <span class="avatar-icon">
-                <span v-if="callState === 'idle' || callState === 'error'">🤖</span>
-                <span v-else-if="callState === 'connecting'">📡</span>
-                <span v-else>🎤</span>  <!-- 通话中始终显示麦克风 -->
-              </span>
-            </div>
-          </div>
-
-          <!-- 联系人名称 -->
-          <div class="contact-name">AI 助手</div>
-          
-          <!-- 状态文本 -->
-          <div class="status-text">{{ stateText }}</div>
-          
-          <!-- 通话时长 -->
-          <div class="call-duration" v-if="isInCall && callState !== 'error'">
-            {{ callDuration }}
-          </div>
+  <Transition name="mini-slide">
+    <div class="voice-mini" v-if="visible" :class="stateClass">
+      <div class="mini-bar" @mousedown.stop>
+        <div class="mini-left">
+          <span class="mini-dot" :class="{ active: isInCall && callState !== 'error' }"></span>
+          <span class="mini-timer" v-if="isInCall && callState !== 'error'">{{ callDuration }}</span>
+          <span class="mini-label">{{ stateText }}</span>
         </div>
 
-        <!-- 音量控制 -->
-        <div class="volume-section" v-if="isInCall">
-          <div class="volume-icon">🔊</div>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            v-model="volume"
-            @input="handleVolumeChange"
-            class="volume-slider"
-          />
-          <div class="volume-value">{{ volume }}</div>
+        <div class="mini-center">
+          <Transition name="text-fade" mode="out-in">
+            <span class="mini-text" v-if="recognitionText && callState === 'talking'" key="r">{{ recognitionText }}</span>
+            <span class="mini-text ai-text" v-else-if="aiReplyText && callState === 'listening'" key="a">{{ aiReplyText }}{{ !aiReplyFinal ? '|' : '' }}</span>
+            <span class="mini-hint" v-else key="h">{{ callState === 'talking' ? '正在聆听...' : callState === 'listening' ? 'AI 回复中...' : stateText }}</span>
+          </Transition>
         </div>
-      </div>
-      
-      <!-- 底部控制按钮 -->
-      <div class="call-controls">
-        <!-- 通话中状态 -->
-        <div class="control-row" v-if="isInCall">
-          <!-- 暂停/继续 -->
-          <button
-            class="control-btn control-btn-secondary"
-            @click="handleToggleRecording"
-            :disabled="callState === 'connecting'"
-            :title="callState === 'talking' ? '暂停' : '继续'"
-          >
-            <span class="control-icon">{{ callState === 'talking' ? '⏸️' : '▶️' }}</span>
-          </button>
 
-          <!-- 打断 -->
-          <button
-            class="control-btn control-btn-interrupt"
-            @click="handleInterrupt"
-            :disabled="callState === 'connecting' || callState === 'idle' || callState === 'error'"
-            title="打断 AI"
-          >
-            <span class="control-icon">✋</span>
+        <div class="mini-right">
+          <button class="mini-btn" v-if="isInCall" @click="handleToggleRecording" :disabled="callState === 'connecting'" :title="callState === 'talking' ? '静音' : '取消静音'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
           </button>
-
-          <!-- 挂断 -->
-          <button
-            class="control-btn control-btn-end"
-            @click="handleEndCall"
-            title="结束通话"
-          >
-            <span class="control-icon">📵</span>
+          <button class="mini-btn" v-if="isInCall" @click="handleInterrupt" :disabled="callState === 'connecting'" title="打断">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          </button>
+          <button class="mini-btn mini-end" @click="handleEndCall" title="挂断">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
           </button>
         </div>
       </div>
     </div>
-  </div>
+  </Transition>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { VoiceCallManager, type VoiceCallState } from '../services/voiceCallManager'
 import type { Live2DAnimationCommand } from '../types/live2d'
+
+type CallState = VoiceCallState | 'ended'
 
 interface Props {
   visible: boolean
@@ -113,8 +54,7 @@ const emit = defineEmits<{
   (e: 'animation', command: Live2DAnimationCommand): void
 }>()
 
-// 状态
-const callState = ref<VoiceCallState>('idle')
+const callState = ref<CallState>('idle')
 const recognitionText = ref('')
 const aiReplyText = ref('')
 const aiReplyFinal = ref(true)
@@ -124,29 +64,27 @@ const voiceCallManager = ref<VoiceCallManager | null>(null)
 const callStartTime = ref<number>(0)
 const callDuration = ref('00:00')
 let durationInterval: number | null = null
+let endCallTimer: number | null = null
 
-// 计算属性
 const isInCall = computed(() => {
-  return callState.value !== 'idle' && callState.value !== 'error'
+  return callState.value !== 'idle' && callState.value !== 'error' && callState.value !== 'ended'
 })
 
-const stateClass = computed(() => {
-  return `state-${callState.value}`
-})
+const stateClass = computed(() => `state-${callState.value}`)
 
 const stateText = computed(() => {
-  const stateMap: Record<VoiceCallState, string> = {
-    idle: '未通话',
-    connecting: '正在连接...',
+  const stateMap: Record<string, string> = {
+    idle: '准备中...',
+    connecting: '连接中',
     connected: '已连接',
-    talking: '正在说话...',
-    listening: 'AI正在回复...',
-    error: '通话出错'
+    talking: '通话中',
+    listening: 'AI 回复中',
+    error: '连接失败',
+    ended: '已结束',
   }
-  return stateMap[callState.value] || '未知状态'
+  return stateMap[callState.value] || ''
 })
 
-// 初始化语音通话管理器
 const initVoiceCallManager = () => {
   if (voiceCallManager.value) {
     voiceCallManager.value.destroy()
@@ -158,15 +96,12 @@ const initVoiceCallManager = () => {
     aiSessionId: props.aiSessionId
   })
 
-  // 设置初始音量
   voiceCallManager.value.setVolume(volume.value / 100)
 
-  // 订阅状态变化
   voiceCallManager.value.onStateChange((state) => {
     callState.value = state
   })
 
-  // 订阅错误
   voiceCallManager.value.onError((error) => {
     errorMessage.value = error.message
     setTimeout(() => {
@@ -174,12 +109,10 @@ const initVoiceCallManager = () => {
     }, 5000)
   })
 
-  // 订阅识别结果
   voiceCallManager.value.onRecognition((text) => {
     recognitionText.value = text
   })
 
-  // 订阅AI回复（v2.0.0：流式回复）
   voiceCallManager.value.onAiReply((text, isFinal) => {
     aiReplyText.value = text
     aiReplyFinal.value = isFinal
@@ -190,7 +123,6 @@ const initVoiceCallManager = () => {
   })
 }
 
-// 更新通话时长
 const updateCallDuration = () => {
   if (callStartTime.value === 0) return
   const elapsed = Math.floor((Date.now() - callStartTime.value) / 1000)
@@ -199,7 +131,6 @@ const updateCallDuration = () => {
   callDuration.value = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-// 开始计时
 const startDurationTimer = () => {
   callStartTime.value = Date.now()
   callDuration.value = '00:00'
@@ -209,17 +140,13 @@ const startDurationTimer = () => {
   durationInterval = window.setInterval(updateCallDuration, 1000)
 }
 
-// 停止计时
 const stopDurationTimer = () => {
   if (durationInterval) {
     clearInterval(durationInterval)
     durationInterval = null
   }
-  callStartTime.value = 0
-  callDuration.value = '00:00'
 }
 
-// 开始通话
 const handleStartCall = async () => {
   try {
     errorMessage.value = ''
@@ -234,16 +161,20 @@ const handleStartCall = async () => {
   }
 }
 
-// 结束通话
 const handleEndCall = () => {
   voiceCallManager.value?.endCall()
   recognitionText.value = ''
   aiReplyText.value = ''
   aiReplyFinal.value = true
   stopDurationTimer()
+  callState.value = 'ended'
+
+  if (endCallTimer) clearTimeout(endCallTimer)
+  endCallTimer = window.setTimeout(() => {
+    emit('close')
+  }, 1000)
 }
 
-// 切换录音状态
 const handleToggleRecording = () => {
   if (callState.value === 'talking') {
     voiceCallManager.value?.pauseRecording()
@@ -252,42 +183,20 @@ const handleToggleRecording = () => {
   }
 }
 
-// 打断 AI 回复（暂停 TTS 播放）
 const handleInterrupt = () => {
   voiceCallManager.value?.pauseTts()
 }
 
-// 音量变化
-const handleVolumeChange = () => {
-  voiceCallManager.value?.setVolume(volume.value / 100)
-}
-
-// 关闭窗口
-const handleClose = () => {
-  if (isInCall.value) {
-    if (confirm('通话正在进行中，确定要关闭吗？')) {
-      handleEndCall()
-      emit('close')
-    }
-  } else {
-    emit('close')
-  }
-}
-
-// 监听 visible 变化
 watch(() => props.visible, (newVal) => {
   if (newVal && !voiceCallManager.value) {
     initVoiceCallManager()
-    // 自动开始通话
     handleStartCall()
   }
 })
 
-// 生命周期
 onMounted(() => {
   if (props.visible) {
     initVoiceCallManager()
-    // 自动开始通话
     handleStartCall()
   }
 })
@@ -298,581 +207,266 @@ onUnmounted(() => {
     voiceCallManager.value = null
   }
   stopDurationTimer()
+  if (endCallTimer) {
+    clearTimeout(endCallTimer)
+    endCallTimer = null
+  }
 })
 </script>
 
 <style scoped>
-/* ============================================
-   容器和模态框基础样式
-   ============================================ */
-.voice-call-container {
+.voice-mini {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(255, 107, 157, 0.95) 0%, rgba(196, 69, 105, 0.95) 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 2000;
-  backdrop-filter: blur(10px);
-  animation: fadeIn 0.3s ease-out;
+  pointer-events: auto;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.voice-call-modal {
-  background: rgba(255, 255, 255, 0.98);
-  border-radius: 32px;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.3);
-  width: 90%;
-  max-width: 420px;
-  max-height: 90vh;
-  overflow: hidden;
-  animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-  position: relative;
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(50px) scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-/* ============================================
-   关闭按钮
-   ============================================ */
-.close-btn-top {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  width: 40px;
-  height: 40px;
-  border: none;
-  background: rgba(0, 0, 0, 0.1);
-  color: #666;
-  border-radius: 50%;
-  cursor: pointer;
-  font-size: 20px;
-  line-height: 1;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  z-index: 10;
+.mini-bar {
   display: flex;
   align-items: center;
-  justify-content: center;
-}
-
-.close-btn-top:hover {
-  background: rgba(0, 0, 0, 0.15);
-  transform: rotate(90deg) scale(1.1);
-}
-
-/* ============================================
-   主内容区
-   ============================================ */
-.call-content {
-  padding: 60px 24px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-/* ============================================
-   头像区域
-   ============================================ */
-.avatar-section {
-  text-align: center;
-  padding: 20px 0;
-}
-
-.avatar-container {
-  position: relative;
-  width: 160px;
-  height: 160px;
-  margin: 0 auto 24px;
-}
-
-/* 波纹效果 */
-.ripple-effect {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 100%;
-  height: 100%;
-}
-
-.ripple {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  border: 3px solid rgba(255, 107, 157, 0.4);
-  animation: rippleAnimation 2s ease-out infinite;
-}
-
-.ripple:nth-child(2) {
-  animation-delay: 0.7s;
-}
-
-.ripple:nth-child(3) {
-  animation-delay: 1.4s;
-}
-
-@keyframes rippleAnimation {
-  0% {
-    width: 100%;
-    height: 100%;
-    opacity: 1;
-  }
-  100% {
-    width: 180%;
-    height: 180%;
-    opacity: 0;
-  }
-}
-
-/* 头像圆圈 */
-.avatar-circle {
-  position: relative;
-  width: 160px;
-  height: 160px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 15px 40px rgba(255, 107, 157, 0.4);
-  transition: all 0.4s ease;
-}
-
-.avatar-icon {
-  font-size: 72px;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
-}
-
-/* 不同状态的头像样式 */
-.state-idle .avatar-circle {
-  background: linear-gradient(135deg, #bdbdbd 0%, #757575 100%);
-}
-
-.state-connecting .avatar-circle {
-  background: linear-gradient(135deg, #FFD54F 0%, #FFB300 100%);
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-.state-connected .avatar-circle {
-  background: linear-gradient(135deg, #FF8A9E 0%, #FF6B9D 100%);
-}
-
-.state-talking .avatar-circle {
-  background: linear-gradient(135deg, #FDA7DF 0%, #FF8A9E 100%);
-  animation: pulse 1s ease-in-out infinite;
-}
-
-.state-listening .avatar-circle {
-  background: linear-gradient(135deg, #FFB74D 0%, #FFA726 100%);
-  animation: pulse 1s ease-in-out infinite;
-}
-
-.state-error .avatar-circle {
-  background: linear-gradient(135deg, #e57373 0%, #ef5350 100%);
-}
-
-@keyframes pulse {
-  0%, 100% {
-    transform: scale(1);
-    box-shadow: 0 15px 40px rgba(255, 107, 157, 0.4);
-  }
-  50% {
-    transform: scale(1.05);
-    box-shadow: 0 20px 50px rgba(255, 107, 157, 0.6);
-  }
-}
-
-/* 联系人名称 */
-.contact-name {
-  font-size: 28px;
-  font-weight: 700;
-  color: #1a1a1a;
-  margin-bottom: 8px;
-  letter-spacing: 0.5px;
-}
-
-/* 状态文本 */
-.status-text {
-  font-size: 16px;
-  color: #666;
-  font-weight: 500;
-  margin-bottom: 8px;
-}
-
-/* 通话时长 */
-.call-duration {
-  font-size: 20px;
-  font-weight: 600;
-  color: #FF6B9D;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 2px;
-}
-
-/* ============================================
-   信息卡片区域
-   ============================================ */
-.info-section {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-height: 200px;
-  overflow-y: auto;
-  padding: 0 4px;
-}
-
-.info-section::-webkit-scrollbar {
-  width: 4px;
-}
-
-.info-section::-webkit-scrollbar-thumb {
-  background: rgba(102, 126, 234, 0.3);
-  border-radius: 2px;
-}
-
-.info-card {
-  background: #f8f9fa;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(30, 30, 40, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-radius: 16px;
-  padding: 14px 16px;
-  animation: slideInCard 0.3s ease-out;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  min-width: 300px;
+  max-width: min(520px, calc(100vw - 40px));
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: all 0.35s ease;
 }
 
-@keyframes slideInCard {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.state-listening .mini-bar {
+  background: rgba(25, 45, 30, 0.9);
+  border-color: rgba(76, 175, 80, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 50, 20, 0.3), 0 0 0 1px rgba(76, 175, 80, 0.06);
 }
 
-.card-label {
+.state-error .mini-bar {
+  background: rgba(50, 25, 25, 0.9);
+  border-color: rgba(239, 83, 80, 0.15);
+}
+
+.state-ended .mini-bar {
+  opacity: 0.5;
+  transform: scale(0.96);
+  pointer-events: none;
+}
+
+.mini-left {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: #666;
-  font-weight: 600;
-  margin-bottom: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
-.label-icon {
-  font-size: 14px;
-}
-
-.card-content {
-  font-size: 15px;
-  color: #1a1a1a;
-  line-height: 1.6;
-  word-break: break-word;
-}
-
-/* 识别卡片 */
-.recognition-card {
-  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
-  border-left: 4px solid #42a5f5;
-}
-
-/* AI回复卡片 */
-.ai-card {
-  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
-  border-left: 4px solid #66bb6a;
-}
-
-/* 流式输入指示器 */
-.streaming-dot {
-  display: inline-block;
+.mini-dot {
   width: 8px;
   height: 8px;
-  background: #66bb6a;
   border-radius: 50%;
-  margin-left: 6px;
-  animation: blink 1s ease-in-out infinite;
+  background: #666;
+  flex-shrink: 0;
+  transition: background 0.3s ease;
 }
 
-@keyframes blink {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.3;
-  }
+.mini-dot.active {
+  background: #4caf50;
+  box-shadow: 0 0 6px rgba(76, 175, 80, 0.5);
+  animation: dotPulse 1.5s ease-in-out infinite;
 }
 
-/* 错误卡片 */
-.error-card {
-  background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
-  border-left: 4px solid #ef5350;
+@keyframes dotPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
-/* ============================================
-   音量控制
-   ============================================ */
-.volume-section {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  background: rgba(255, 107, 157, 0.08);
-  border-radius: 16px;
+.state-connecting .mini-dot.active {
+  background: #ffc107;
+  box-shadow: 0 0 6px rgba(255, 193, 7, 0.5);
+  animation: dotPulse 0.8s ease-in-out infinite;
 }
 
-.volume-icon {
-  font-size: 20px;
-  min-width: 24px;
+.state-listening .mini-dot.active {
+  background: #81c784;
+  box-shadow: 0 0 6px rgba(129, 199, 132, 0.5);
 }
 
-.volume-slider {
-  flex: 1;
-  height: 6px;
-  border-radius: 3px;
-  outline: none;
-  -webkit-appearance: none;
-  background: linear-gradient(to right, rgba(255, 107, 157, 0.3) 0%, rgba(196, 69, 105, 0.3) 100%);
-  position: relative;
+.state-talking .mini-dot.active {
+  background: #64b5f6;
+  box-shadow: 0 0 6px rgba(100, 181, 246, 0.5);
 }
 
-.volume-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
-  box-shadow: 0 2px 8px rgba(255, 107, 157, 0.4);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.volume-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
-  box-shadow: 0 4px 12px rgba(255, 107, 157, 0.6);
-}
-
-.volume-slider::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
-  box-shadow: 0 2px 8px rgba(255, 107, 157, 0.4);
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
-}
-
-.volume-slider::-moz-range-thumb:hover {
-  transform: scale(1.2);
-  box-shadow: 0 4px 12px rgba(255, 107, 157, 0.6);
-}
-
-.volume-value {
-  font-size: 14px;
-  color: #FF6B9D;
+.mini-timer {
+  font-size: 13px;
   font-weight: 600;
-  min-width: 32px;
-  text-align: right;
+  color: rgba(255, 255, 255, 0.55);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 1px;
+  min-width: 38px;
 }
 
-/* ============================================
-   底部控制按钮
-   ============================================ */
-.call-controls {
-  padding: 24px;
-  background: rgba(255, 107, 157, 0.05);
-  border-top: 1px solid rgba(255, 107, 157, 0.1);
+.mini-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
 }
 
-.control-row {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 20px;
-}
-
-.control-btn {
-  width: 70px;
-  height: 70px;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-  position: relative;
+.mini-center {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
 }
 
-.control-btn::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
-  transform: translate(-50%, -50%);
-  transition: width 0.6s, height 0.6s;
+.mini-text {
+  display: block;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.4;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.control-btn:hover::before {
-  width: 100%;
-  height: 100%;
+.ai-text {
+  color: rgba(165, 214, 167, 0.95);
 }
 
-.control-btn:hover:not(:disabled) {
-  transform: translateY(-4px) scale(1.05);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
+.mini-hint {
+  display: block;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.3);
+  text-align: center;
+  font-style: italic;
 }
 
-.control-btn:active:not(:disabled) {
-  transform: translateY(-2px) scale(0.98);
+.text-fade-enter-active,
+.text-fade-leave-active {
+  transition: all 0.2s ease;
+}
+.text-fade-enter-from,
+.text-fade-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
 }
 
-.control-btn:disabled {
-  opacity: 0.4;
+.mini-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.mini-btn {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mini-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.95);
+  transform: scale(1.05);
+}
+
+.mini-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.mini-btn:disabled {
+  opacity: 0.25;
   cursor: not-allowed;
-  transform: none;
 }
 
-.control-icon {
-  font-size: 32px;
-  position: relative;
-  z-index: 1;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+.mini-btn svg {
+  width: 17px;
+  height: 17px;
 }
 
-/* 呼叫按钮 */
-.control-btn-call {
-  background: linear-gradient(135deg, #FF8A9E 0%, #FF6B9D 100%);
-  width: 80px;
-  height: 80px;
+.mini-end {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: rgba(239, 83, 80, 0.75);
+  color: #fff;
 }
 
-.control-btn-call .control-icon {
-  font-size: 36px;
+.mini-end:hover:not(:disabled) {
+  background: rgba(239, 83, 80, 0.95);
 }
 
-/* 次要按钮 */
-.control-btn-secondary {
-  background: linear-gradient(135deg, #FDA7DF 0%, #FF8A9E 100%);
+.mini-end svg {
+  width: 18px;
+  height: 18px;
 }
 
-.control-btn-interrupt {
-  background: linear-gradient(135deg, #FFA726 0%, #FFB74D 100%);
+.mini-slide-enter-active {
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-
-.control-btn-end {
-  background: linear-gradient(135deg, #E84393 0%, #C44569 100%);
-  width: 80px;
-  height: 80px;
+.mini-slide-leave-active {
+  transition: all 0.25s ease;
 }
-
-.control-btn-end .control-icon {
-  font-size: 36px;
+.mini-slide-enter-from {
+  opacity: 0;
+  transform: translateX(-50%) translateY(24px) scale(0.92);
 }
-
-/* ============================================
-   响应式设计
-   ============================================ */
-@media (max-width: 768px) {
-  .voice-call-modal {
-    width: 95%;
-    max-width: 360px;
-  }
-
-  .call-content {
-    padding: 50px 20px 20px;
-  }
-
-  .avatar-container {
-    width: 140px;
-    height: 140px;
-  }
-
-  .avatar-circle {
-    width: 140px;
-    height: 140px;
-  }
-
-  .avatar-icon {
-    font-size: 64px;
-  }
-
-  .contact-name {
-    font-size: 24px;
-  }
-
-  .control-btn {
-    width: 60px;
-    height: 60px;
-  }
-
-  .control-btn-call,
-  .control-btn-end {
-    width: 70px;
-    height: 70px;
-  }
-
-  .control-icon {
-    font-size: 28px;
-  }
-
-  .control-btn-call .control-icon,
-  .control-btn-end .control-icon {
-    font-size: 32px;
-  }
+.mini-slide-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(12px) scale(0.96);
 }
 
 @media (max-width: 480px) {
-  .avatar-container {
-    width: 120px;
-    height: 120px;
+  .voice-mini {
+    bottom: 70px;
   }
 
-  .avatar-circle {
-    width: 120px;
-    height: 120px;
+  .mini-bar {
+    min-width: auto;
+    width: calc(100vw - 32px);
+    padding: 9px 12px;
+    gap: 8px;
   }
 
-  .avatar-icon {
-    font-size: 56px;
+  .mini-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
   }
 
-  .contact-name {
-    font-size: 22px;
+  .mini-end {
+    width: 36px;
+    height: 36px;
   }
 
-  .control-row {
-    gap: 16px;
+  .mini-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .mini-text {
+    font-size: 12px;
+  }
+
+  .mini-timer {
+    font-size: 12px;
+    min-width: 34px;
   }
 }
 </style>
