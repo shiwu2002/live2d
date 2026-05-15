@@ -190,6 +190,7 @@ import CharacterSettings from './components/CharacterSettings.vue'
 import { autoModelConfig, getAutoModelIds } from './config/auto-models'
 import { getChatConfig, generateSessionId } from './config'
 import { getWebSocketUrl, logEnvConfig } from './config'
+import { getDisplayConfig } from './config/display'
 import type { UserLoginInfo, UserInfo } from './types/login'
 import type { Live2DAnimationCommand } from './types/live2d'
 import { authService } from './services/authService'
@@ -281,8 +282,9 @@ const currentModelName = computed(() => {
 })
 
 // 小窗口配置 - 固定尺寸，适合 Live2D 模型显示比例
-const widgetWidth = ref(300)
-const widgetHeight = ref(400)
+const displayCfg = getDisplayConfig()
+const widgetWidth = ref(displayCfg.widget.width)
+const widgetHeight = ref(displayCfg.widget.height)
 
 const widgetPosX = ref<number>(0)
 const widgetPosY = ref<number>(0)
@@ -596,13 +598,25 @@ onMounted(async () => {
 
   const w = window.innerWidth
   const h = window.innerHeight
-  const width = 320
-  const height = 400 + 56 + 56
+  const width = displayCfg.widget.width
+  const height = displayCfg.widget.height + 56 + 56
   widgetPosX.value = Math.max(0, w - width - 20)
   widgetPosY.value = Math.max(0, h - Math.min(h - 20, height) - 20)
 
   await detectTauri()
   console.log('onMounted tauri check, isTauri:', isTauri.value)
+
+  if (isTauri.value) {
+    try {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window')
+      const win = getCurrentWindow()
+      const { width: cfgW, height: cfgH } = displayCfg.window
+      await win.setSize(new (await import('@tauri-apps/api/dpi')).LogicalSize(cfgW, cfgH))
+      console.log(`✅ 窗口大小已设置为 ${cfgW}x${cfgH}`)
+    } catch (e) {
+      console.warn('⚠️ 设置窗口大小失败:', e)
+    }
+  }
 
   ;(async () => {
     console.log('=== STARTING TRANSPARENCY SETUP ===')

@@ -10,6 +10,7 @@ import { extensions } from '@pixi/extensions'
 import type { Live2DModel as Live2DModelType } from 'pixi-live2d-display/cubism4'
 import type { Live2DAnimationCommand, Live2DAnimationInfo, Live2DEmotion } from '../types/live2d'
 import { resolveAnimation } from '../config/emotionMap'
+import { getModelDisplayConfig } from '../config/display'
 
 
 const props = defineProps<{
@@ -326,16 +327,25 @@ const loadModel = async () => {
       model.y = props.y
       model.scale.set(props.scale)
     } else {
+      const displayCfg = getModelDisplayConfig(props.modelId)
       const containerWidth = app.screen.width
       const containerHeight = app.screen.height
       const modelWidth = model.width
       const modelHeight = model.height
-      const scaleX = (containerWidth * 0.8) / modelWidth
-      const scaleY = (containerHeight * 0.8) / modelHeight
+      const fillRatio = displayCfg.fillRatio ?? 0.8
+      const scaleX = (containerWidth * fillRatio) / modelWidth
+      const scaleY = (containerHeight * fillRatio) / modelHeight
       const optimalScale = Math.min(scaleX, scaleY)
-      model.scale.set(optimalScale)
-      model.x = containerWidth / 2
-      model.y = containerHeight / 2
+      model.scale.set(displayCfg.defaultScale ?? optimalScale)
+      model.anchor.set(displayCfg.anchorX ?? 0.5, displayCfg.anchorY ?? 0.5)
+      model.x = displayCfg.positionX === 'center' ? containerWidth / 2
+        : displayCfg.positionX === 'left' ? 0
+        : displayCfg.positionX === 'right' ? containerWidth
+        : typeof displayCfg.positionX === 'number' ? displayCfg.positionX : containerWidth / 2
+      model.y = displayCfg.positionY === 'center' ? containerHeight / 2
+        : displayCfg.positionY === 'top' ? 0
+        : displayCfg.positionY === 'bottom' ? containerHeight
+        : typeof displayCfg.positionY === 'number' ? displayCfg.positionY : containerHeight / 2
     }
 
     if (model.internalModel.motionManager) {
@@ -407,16 +417,24 @@ const handleMouseMove = (event: MouseEvent) => {
 
 const adjustModelToContainer = () => {
   if (!app || !model) return
+  const displayCfg = getModelDisplayConfig(props.modelId)
   const containerWidth = app.screen.width
   const containerHeight = app.screen.height
   const baseModelWidth = model.width / model.scale.x
   const baseModelHeight = model.height / model.scale.y
-  const scaleX = (containerWidth * 0.8) / baseModelWidth
-  const scaleY = (containerHeight * 0.8) / baseModelHeight
+  const fillRatio = displayCfg.fillRatio ?? 0.8
+  const scaleX = (containerWidth * fillRatio) / baseModelWidth
+  const scaleY = (containerHeight * fillRatio) / baseModelHeight
   const optimalScale = Math.min(scaleX, scaleY)
-  model.scale.set(optimalScale)
-  model.x = containerWidth / 2
-  model.y = containerHeight / 2
+  model.scale.set(displayCfg.defaultScale ?? optimalScale)
+  model.x = displayCfg.positionX === 'center' ? containerWidth / 2
+    : displayCfg.positionX === 'left' ? 0
+    : displayCfg.positionX === 'right' ? containerWidth
+    : typeof displayCfg.positionX === 'number' ? displayCfg.positionX : containerWidth / 2
+  model.y = displayCfg.positionY === 'center' ? containerHeight / 2
+    : displayCfg.positionY === 'top' ? 0
+    : displayCfg.positionY === 'bottom' ? containerHeight
+    : typeof displayCfg.positionY === 'number' ? displayCfg.positionY : containerHeight / 2
 }
 
 const onResize = () => {
