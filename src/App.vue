@@ -219,49 +219,33 @@ import iconVoice from './images/a-yuyindianhuatongzhi48.png'
 import iconCharacter from './images/jiaoseguanlijiaoseshezhi.png'
 import iconMore from './images/gengduo.png'
 
-const isTauri = ref(false)
+const isDesktop = ref(!!(window as any).electronAPI?.isElectron)
 
-const detectTauri = async () => {
-  if (isTauri.value) return true
-  try {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window')
-    const win = getCurrentWindow()
-    if (win) {
-      isTauri.value = true
-      return true
-    }
-  } catch {}
-  return false
-}
-
-const handleDragStart = async (_e: MouseEvent) => {
+const handleDragStart = (e: MouseEvent) => {
   console.log('handleDragStart called')
-  try {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window')
-    console.log('calling startDragging...')
-    await getCurrentWindow().startDragging()
-    console.log('startDragging done')
-  } catch (err) {
-    console.error('Tauri drag failed:', err)
+  const api = (window as any).electronAPI
+  if (!api) return
+  let startX = e.screenX || e.clientX
+  let startY = e.screenY || e.clientY
+  api.startDrag()
+  const onMove = (ev: MouseEvent) => {
+    api.dragMove(ev.screenX - startX, ev.screenY - startY)
   }
+  const onUp = () => {
+    api.endDrag()
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+  }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
 }
 
 const handleMinimize = async () => {
-  try {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window')
-    await getCurrentWindow().minimize()
-  } catch (err) {
-    console.warn('Minimize failed:', err)
-  }
+  await (window as any).electronAPI?.minimizeWindow()
 }
 
 const handleQuit = async () => {
-  try {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window')
-    await getCurrentWindow().close()
-  } catch (err) {
-    console.warn('Quit failed:', err)
-  }
+  await (window as any).electronAPI?.closeWindow()
 }
 
 // 模型信息接口
@@ -637,15 +621,12 @@ onMounted(async () => {
   widgetPosX.value = Math.max(0, w - width - 20)
   widgetPosY.value = Math.max(0, h - Math.min(h - 20, height) - 20)
 
-  await detectTauri()
-  console.log('onMounted tauri check, isTauri:', isTauri.value)
+  console.log('onMounted desktop check, isDesktop:', isDesktop.value)
 
-  if (isTauri.value) {
+  if (isDesktop.value) {
     try {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window')
-      const win = getCurrentWindow()
       const { width: cfgW, height: cfgH } = displayCfg.window
-      await win.setSize(new (await import('@tauri-apps/api/dpi')).LogicalSize(cfgW, cfgH))
+      await (window as any).electronAPI?.setWindowSize(cfgW, cfgH)
       console.log(`✅ 窗口大小已设置为 ${cfgW}x${cfgH}`)
     } catch (e) {
       console.warn('⚠️ 设置窗口大小失败:', e)
@@ -680,27 +661,7 @@ onMounted(async () => {
     `
     document.head.appendChild(style)
     console.log('✅ Injected force-transparent styles')
-
-    try {
-      const { getCurrentWebview } = await import('@tauri-apps/api/webview')
-      const wv = getCurrentWebview()
-      console.log('got webview:', !!wv)
-      await wv.setBackgroundColor('#00000000')
-      console.log('✅ Webview setBackgroundColor done')
-    } catch (e) {
-      console.warn('⚠️ setBackgroundColor failed:', e)
-    }
-
-    try {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window')
-      const win = getCurrentWindow()
-      console.log('got window:', !!win)
-      await win.setBackgroundColor('#00000000')
-      console.log('✅ Window setBackgroundColor done')
-    } catch (e) {
-      console.warn('⚠️ Window setBackgroundColor failed:', e)
-    }
-
+    console.log('✅ Electron mode - transparency handled by BrowserWindow config')
     console.log('=== TRANSPARENCY SETUP DONE ===')
   })()
 })

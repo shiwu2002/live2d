@@ -1,6 +1,6 @@
 # Live2D 智能交互应用
 
-这是一个基于 Vue 3 + Vite + pixi-live2d-display 实现的 Live2D 智能交互桌面应用，集成了实时聊天、语音交互、WebSocket 通信等功能。
+这是一个基于 Vue 3 + Vite + pixi-live2d-display 实现的 Live2D 智能交互桌面应用，集成了实时聊天、语音交互、WebSocket 通信等功能。使用 **Electron** 桌面端框架，全平台支持透明窗口。
 
 ## ✨ 功能特性
 
@@ -58,6 +58,10 @@
 - **MediaRecorder API** - 音频录制
 - **HTMLAudioElement** - 音频播放
 
+### 桌面端框架
+
+- **Electron v42** (Chromium) — 全平台透明窗口支持，无需额外依赖
+
 ## 📁 项目结构
 
 ```
@@ -93,6 +97,9 @@ live2d/
 │   └── style.css                 # 全局样式
 ├── scripts/
 │   └── scan-models.js            # 模型扫描脚本
+├── electron/                     # Electron 桌面端
+│   ├── main.cjs                  # Electron 主进程（透明窗口 + IPC）
+│   └── preload.cjs               # Electron 预加载脚本
 ├── LIVE2D_IMPLEMENTATION_GUIDE.md  # Live2D 实现指南
 ├── MODEL_MANAGEMENT_GUIDE.md       # 模型管理指南
 └── package.json
@@ -104,16 +111,15 @@ live2d/
 
 - **Node.js** >= 18
 - **npm** >= 9（或 pnpm/yarn）
-- **Rust** 工具链（仅桌面端需要，[安装指南](https://tauri.app/start/prerequisites/)）
-- **macOS**: Xcode Command Line Tools (`xcode-select --install`）
-- **Windows**: Microsoft Visual Studio C++ Build Tools + WebView2
-- **Linux**: libwebkit2gtk-4.0-dev, libgtk-3-dev, libayatana-dev
 
-### 1、安装rust
+> 💡 **首次安装 Electron**：如果网络较慢，可设置镜像源加速：
+> ```bash
+> # Windows PowerShell
+> $env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
+> npx install-electron --no-fancy-winning
+> ```
 
-[rustup.rs - Rust 工具链安装器](https://rustup.rs/?spm=5176.28103460.0.0.1bca2988qYpY1H)
-
-### 2、 安装依赖
+### 安装依赖
 
 ```bash
 npm install
@@ -139,22 +145,22 @@ npm run build && npm run preview
 
 > ⚠️ Web 端不支持窗口拖拽、透明背景、置顶等桌面端特性，仅用于功能调试。
 
-### 桌面端（Tauri 桌面宠物）
+### 桌面端（Electron）
 
-使用 Tauri 将应用打包为原生桌面窗口，支持：
+使用 Electron 将应用打包为原生桌面窗口，全平台支持：
 
-- ✅ 窗口拖拽移动（顶部拖拽手柄）
-- ✅ 模型背景隐藏（更多菜单 → 隐藏背景）
+- ✅ 窗口拖拽移动
+- ✅ **真透明背景**（Windows/macOS/Linux 均支持）
 - ✅ 窗口始终置顶
-- ✅ 无边框透明窗口
-- ✅ 系统托盘集成
+- ✅ 无边框窗口
+- ✅ Live2D + WebGL 完美兼容
 
 ```bash
-# 开发模式（同时启动 Vite 和 Tauri 窗口，支持热更新）
-npm run tauri dev
+# 开发模式（同时启动 Vite 和 Electron 窗口，支持热更新）
+npm run electron:dev
 ```
 
-首次运行会自动编译 Rust 后端，耗时约 1-3 分钟。之后修改前端代码会**即时热更新**，无需重启。
+首次运行会下载 Electron 二进制文件（约 90MB），之后无需重复下载。修改前端代码会**即时热更新**，无需重启。
 
 #### 桌面端操作说明
 
@@ -177,117 +183,82 @@ npm run tauri dev
 # 仅构建前端资源（生成 dist/ 目录）
 npm run build
 
-# 构建 Tauri 桌面端安装包（包含前端构建 + Rust 编译）
-npm run tauri build
+# 构建 Electron 桌面端安装包
+npm run electron:build
 ```
 
-安装包输出位置：
+#### 打包输出
 
 ```
-src-tauri/target/release/bundle/
-├── dmg/              # macOS: .dmg 安装镜像
-├── app/              # macOS: .app 应用程序
-├── msi/              # Windows: .msi 安装程序
-└── deb/              # Linux: .deb 安装包
+release/
+├── win/              # Windows: .exe 安装程序 (NSIS)
+└── mac/              # macOS: .dmg / .app
 ```
 
 ### 各平台打包详情
 
-#### macOS
-
-```bash
-npm run tauri build
-# 输出:
-#   src-tauri/target/release/bundle/dmg/Live2D桌宠_0.1.0_aarch64.dmg
-#   src-tauri/target/release/bundle/app/Live2D桌宠.app
-```
-
-> ⚠️ macOS 打包需要开启 `macos-private-api` 功能（已在 Cargo.toml 中配置），这意味着**无法上架 Mac App Store**。如需上架，请移除该 feature。
-
 #### Windows
 
 ```bash
-npm run tauri build
+npm run electron:build
 # 输出:
-#   src-tauri/target/release/bundle/msi/Live2D桌宠_0.1.0_x64_en-US.msi
-#   src-tauri/target/release/bundle/nsis/Live2D桌宠_0.1.0_x64-setup.exe  (NSIS)
+#   release/win/Live2D桌宠 Setup x.x.x.exe
 ```
 
-需要提前安装 [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)。
-
-#### Linux (deb)
+#### macOS
 
 ```bash
-npm run tauri build
+npm run electron:build
 # 输出:
-#   src-tauri/target/release/bundle/deb/live2d_0.1.0_amd64.deb
+#   release/mac/Live2D桌宠-x.x.x.dmg
 ```
 
-依赖：`libwebkit2gtk-4.0-37`, `libgtk-3`, `libayatana`
+#### Linux
+
+依赖：`libgtk-3-0`, `libnss3`, `libasound2`
 
 ```bash
-sudo apt install libwebkit2gtk-4.0-37 libgtk-3-0 libayatana0.1
+sudo apt install libgtk-3-0 libnss3 libasound2
+npm run electron:build
 ```
 
 ### 自定义打包配置
 
-打包选项在 `src-tauri/tauri.conf.json` 的 `bundle` 字段中配置：
+打包选项在 `package.json` → `build` 字段中配置：
 
 ```jsonc
 {
-  "bundle": {
-    "active": true,
-    "targets": "all",           // "all" | "appimage" | "deb" | "msi" | "dmg"
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",       // macOS
-      "icons/icon.ico"         // Windows
-    ],
-    // macOS 特定
-    "macos": {
-      "minimumSystemVersion": "10.15",
-      "entitlements": null,
-      "exceptionDomain": "",
-      "signingIdentity": null,   // Apple Developer ID（代码签名）
-      "notarize": false,          // 是否公证（需 Apple 账号）
-      "providerShortName": ""
-    },
-    // Windows 特定
-    "windows": {
-      "certificateThumbprint": null,  // 代码签名证书指纹
-      "digestAlgorithm": "sha256",
-      "timestampUrl": ""
-    }
+  "build": {
+    "appId": "com.live2d.desktop-pet",
+    "productName": "Live2D桌宠",
+    "files": ["dist/**/*", "electron/**/*", "public/**/*"],
+    "win": { "target": "nsis", "icon": "public/icon.ico" },
+    "mac": { "target": "dmg", "icon": "public/icon.icns" }
   }
 }
 ```
 
 ***
 
+***
+
 ## 🔧 高级配置
 
-### Tauri 窗口配置
+### Electron 窗口配置
 
-窗口属性在 `src-tauri/tauri.conf.json` → `app.windows` 中定义：
+窗口属性在 `electron/main.cjs` → `createWindow()` 中定义：
 
-```jsonc
-{
-  "label": "main",
-  "title": "Live2D桌宠",
-  "width": 400,
-  "height": 500,
-  "minWidth": 200,
-  "minHeight": 300,
-  "resizable": true,        // 允许调整大小
-  "fullscreen": false,
-  "transparent": true,       // 透明窗口（macOS 需 macos-private-api）
-  "decorations": false,      // 无边框
-  "alwaysOnTop": true,       // 始终置顶
-  "skipTaskbar": false,       // 显示在任务栏
-  "shadow": false            // 无窗口阴影
-}
+```javascript
+new BrowserWindow({
+  width: 400,
+  height: 500,
+  minWidth: 200,
+  minHeight: 300,
+  transparent: true,       // 真透明窗口（全平台支持）
+  frame: false,            // 无边框
+  alwaysOnTop: true,       // 始终置顶
+  hasShadow: false         // 无窗口阴影
+})
 ```
 
 ### 模型管理
@@ -460,6 +431,16 @@ formatDateTime(timestamp: number): string       // 完整日期时间
 }
 ```
 
+**Electron 开发依赖（桌面端）：**
+
+```json
+{
+  "electron": "^42.1.0",           // Electron 运行时
+  "electron-builder": "^26.8.1",   // 打包工具
+  "concurrently": "^9.2.1"         // 并行运行 Vite + Electron
+}
+```
+
 **CDN 依赖：**
 
 - Live2D Cubism Core: `https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js`
@@ -501,6 +482,25 @@ export interface ChatMessage {
 - `ParamBodyAngleX/Y/Z` - 身体旋转
 
 ## 📝 最近更新
+
+### v3.0.0 - 纯 Electron 桌面端 (2026-05-15)
+
+#### 彻底移除 Tauri，统一使用 Electron
+
+- 删除 `src-tauri/` 整个目录（Rust 后端、Tauri 配置）
+- 卸载 `@tauri-apps/api` 和 `@tauri-apps/cli`
+- 清理 `App.vue` 中所有 Tauri 兼容代码（`isTauri`、`detectTauri`、`@tauri-apps` import 等）
+- 简化为单一 `isDesktop` 变量检测 Electron 环境
+- **代码量大幅减少**：不再需要双框架兼容层
+- 全平台透明窗口统一可靠（Windows/macOS/Linux）
+
+#### 技术栈变更
+
+| 移除 | 保留 |
+|------|------|
+| ~~Tauri v2~~ + Rust 工具链 | ✅ Electron v42 |
+| ~~WebView2~~ 白色填充 bug | ✅ Chromium 透明原生支持 |
+| ~~macos-private-api~~ | ✅ 跨平台一致 API |
 
 ### v2.0.0 - 项目结构优化 (2026-01-09)
 
@@ -567,7 +567,7 @@ await model.motion('动画组名', 动画索引)
 await model.motion('idle', 0)
 ```
 
-### Q: 如何自定义消息类型？
+### Q: 如何添加更多动画？
 
 **A:**
 
@@ -586,6 +586,9 @@ await model.motion('idle', 0)
 - ✅ 图片消息展示
 - ✅ 多模型支持
 - ✅ 模块化架构
+- ✅ **Electron 桌面应用**（全平台透明窗口）
+- ✅ 无边框拖拽
+- ✅ 窗口置顶/最小化/关闭
 
 ### 待开发
 
@@ -596,7 +599,6 @@ await model.motion('idle', 0)
 - [ ] 点击交互动画
 - [ ] 历史消息记录
 - [ ] 用户设置面板
-- [ ] Electron 桌面应用封装
 - [ ] 多语言支持
 
 ## 🔗 参考资源
@@ -607,6 +609,7 @@ await model.motion('idle', 0)
 - [Vue 3 官方文档](https://cn.vuejs.org/)
 - [TypeScript 官方文档](https://www.typescriptlang.org/)
 - [Vite 官方文档](https://cn.vitejs.dev/)
+- [Electron 官方文档](https://www.electronjs.org/docs)
 
 ## 📄 许可证
 
