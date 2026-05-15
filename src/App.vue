@@ -46,7 +46,7 @@
     <div v-if="discoveredModels.length > 0" class="pet-container desktop-pet">
       <div class="pet-model-area desktop-pet">
         <div class="drag-handle" @mousedown="handleDragStart" title="拖拽移动窗口">
-          <div class="drag-indicator"></div>
+          <img src="./images/移动.png" class="drag-icon" alt="拖拽" />
         </div>
         <Live2DModel
           v-if="modelPath"
@@ -763,38 +763,54 @@ const handleClickOutside = (e: MouseEvent) => {
 
 .drag-handle {
   position: absolute;
-  top: 8px;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
-  padding: 6px 18px;
+  transform: translate(-50%, -50%);
+  width: 80px;
+  height: 80px;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10;
   cursor: grab;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(8px);
-  transition: background 0.2s ease;
+  border-radius: 50%;
+  background: transparent;
   -webkit-app-region: drag;
   -webkit-user-select: none;
   user-select: none;
 }
 
-.drag-handle:hover {
-  background: rgba(255, 255, 255, 0.35);
+.drag-handle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  transform: scale(0.5);
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.drag-indicator {
-  width: 28px;
-  height: 3px;
-  border-radius: 1.5px;
-  background: rgba(0, 0, 0, 0.2);
-  transition: background 0.2s ease;
+.drag-handle:hover::before {
+  opacity: 1;
+  transform: scale(1);
 }
 
-.drag-handle:hover .drag-indicator {
-  background: rgba(0, 0, 0, 0.4);
+.drag-icon {
+  width: 36px;
+  height: 36px;
+  display: block;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: opacity 0.25s ease 0.05s, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) 0.05s;
+  position: relative;
+  z-index: 1;
+}
+
+.drag-handle:hover .drag-icon {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .pet-toolbar {
