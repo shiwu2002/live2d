@@ -790,7 +790,29 @@ const handleClickOutside = (e: MouseEvent) => {
 .app-container.desktop-pet {
   min-height: 100vh;
   background: transparent !important;
-  overflow: visible;
+  overflow: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+
+.app-container.desktop-pet::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.app-container.desktop-pet::-webkit-scrollbar-track {
+  background: rgba(255, 182, 193, 0.1);
+  border-radius: 3px;
+}
+
+.app-container.desktop-pet::-webkit-scrollbar-thumb {
+  background: rgba(255, 107, 157, 0.4);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.app-container.desktop-pet::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 107, 157, 0.6);
 }
 
 .loading-tip {
@@ -827,7 +849,7 @@ const handleClickOutside = (e: MouseEvent) => {
   backdrop-filter: none;
   overflow: visible;
   width: auto;
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -837,19 +859,16 @@ const handleClickOutside = (e: MouseEvent) => {
 
 .background-board {
   position: fixed;
-  top: 10px;
-  left: 10px;
-  right: 10px;
-  bottom: 10px;
-  width: calc(100vw - 20px);
-  height: calc(100vh - 20px);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
   background: linear-gradient(135deg, #FFB6C1 0%, #FFC0CB 50%, #FFCCD5 100%);
   border-radius: 20px;
   z-index: 0;
   transition: all 0.3s ease;
-  box-shadow:
-    0 8px 32px rgba(255, 107, 157, 0.2),
-    0 16px 48px rgba(255, 107, 157, 0.12);
   overflow: hidden;
 }
 
@@ -1094,11 +1113,25 @@ const handleClickOutside = (e: MouseEvent) => {
   box-shadow: 0 8px 32px rgba(255, 107, 157, 0.2);
   backdrop-filter: blur(10px);
   min-width: 200px;
+  max-height: min(400px, calc(100vh - 120px));
   z-index: 1002;
-  overflow: hidden;
+  overflow-y: auto;
   animation: dropdownFadeIn 0.15s ease;
   border: 1px solid #FFE0EB;
   padding: 6px 0;
+}
+
+.more-dropdown::-webkit-scrollbar {
+  width: 4px;
+}
+
+.more-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.more-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(255, 107, 157, 0.3);
+  border-radius: 2px;
 }
 
 @keyframes dropdownFadeIn {
