@@ -214,7 +214,7 @@ import VoiceCall from './components/VoiceCall.vue'
 import UserAuthModal from './components/UserAuthModal.vue'
 import CharacterSettings from './components/CharacterSettings.vue'
 import CustomModelManager from './components/CustomModelManager.vue'
-import { autoModelConfig, getAutoModelIds } from './config/auto-models'
+import { autoModelConfig, getAutoModelIds, getValidAutoModelIds } from './config/auto-models'
 import { getChatConfig, generateSessionId } from './config'
 import { getWebSocketUrl, logEnvConfig } from './config'
 import { getDisplayConfig } from './config/display'
@@ -263,28 +263,54 @@ interface ModelInfo {
   id: string
   name: string
   path: string
+  isValid?: boolean  // 文件验证状态
 }
 
 const live2dModelRef = ref<InstanceType<typeof Live2DModel> | null>(null)
 
-// 从自动生成的配置中获取模型列表
+// 从自动生成的配置中获取模型列表（只包含有效模型）
 const discoveredModels = computed<ModelInfo[]>(() => {
-  const modelIds = getAutoModelIds()
-  return modelIds.map(id => ({
-    id,
-    name: id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-    path: autoModelConfig[id]?.path ?? ''
-  }))
+  // 使用新的验证函数，只返回文件存在的模型
+  const validModelIds = getValidAutoModelIds()
+
+  return validModelIds.map(id => {
+    const config = autoModelConfig[id]
+    return {
+      id,
+      name: id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      path: config?.path ?? '',
+      isValid: config?.exists ?? false
+    }
+  })
 })
 
 // 当前选中的模型 ID
 const currentModel = ref<string>('')
 
-// 计算当前模型路径
+// 计算当前模型路径（现在路径已包含正确的 base 前缀）
 const modelPath = computed(() => {
   const model = discoveredModels.value.find(m => m.id === currentModel.value)
-  return model ? model.path : ''
+  return model?.isValid ? model.path : ''
 })
+
+// 模型加载错误状态
+const modelLoadError = ref<string>('')
+
+// 验证并设置默认模型（选择第一个有效模型）
+const initializeDefaultModel = () => {
+  const validIds = getValidAutoModelIds()
+
+  if (validIds.length > 0) {
+    // 如果当前模型无效或为空，设置为第一个有效模型
+    if (!currentModel.value || !validIds.includes(currentModel.value)) {
+      currentModel.value = validIds[0] ?? ''
+      console.log(`✅ 已加载 ${validIds.length} 个有效模型，默认: ${validIds[0]}`)
+    }
+  } else {
+    console.warn('⚠️  未找到有效的 Live2D 模型')
+    modelLoadError.value = '未找到可用的模型文件，请运行 npm run scan-models'
+  }
+}
 
 // 获取当前模型显示名称
 const currentModelName = computed(() => {
@@ -692,12 +718,8 @@ const checkLoginStatus = () => {
 // 组件初始化时检查登录状态
 checkLoginStatus()
 
-// 初始化：设置默认模型
-const modelIds = getAutoModelIds()
-if (modelIds.length > 0) {
-  currentModel.value = modelIds[0] || ''
-  console.log(`已加载 ${modelIds.length} 个模型，当前模型: ${modelIds[0]}`)
-}
+// 初始化：验证并设置默认有效模型
+initializeDefaultModel()
 
 // 输出环境配置信息（开发时便于调试）
 logEnvConfig()

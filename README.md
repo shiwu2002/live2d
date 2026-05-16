@@ -113,18 +113,31 @@ live2d/
 - **npm** >= 9（或 pnpm/yarn）
 
 > 💡 **首次安装 Electron**：如果网络较慢，可设置镜像源加速：
+>
 > ```bash
 > # Windows PowerShell
 > $env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
 > npx install-electron --no-fancy-winning
 > ```
-
 ### 安装依赖
 
 ```bash
 npm install
 ```
+### 扫描模型
 
+```bash
+npm run scan-models
+```
+### 运行监控
+
+```bash
+npm run watch-models        # 单独运行监控
+1. 将模型文件夹放入 public/model/
+2. 等待 1-2 秒（自动检测）或手动运行:
+   npm run scan-models
+3. 浏览器自动刷新显示新模型 ✨
+```
 ***
 
 ## 💻 启动方式
@@ -496,11 +509,11 @@ export interface ChatMessage {
 
 #### 技术栈变更
 
-| 移除 | 保留 |
-|------|------|
-| ~~Tauri v2~~ + Rust 工具链 | ✅ Electron v42 |
-| ~~WebView2~~ 白色填充 bug | ✅ Chromium 透明原生支持 |
-| ~~macos-private-api~~ | ✅ 跨平台一致 API |
+| 移除                      | 保留                |
+| ----------------------- | ----------------- |
+| ~~Tauri v2~~ + Rust 工具链 | ✅ Electron v42    |
+| ~~WebView2~~ 白色填充 bug   | ✅ Chromium 透明原生支持 |
+| ~~macos-private-api~~   | ✅ 跨平台一致 API       |
 
 ### v2.0.0 - 项目结构优化 (2026-01-09)
 
