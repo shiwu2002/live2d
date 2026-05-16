@@ -108,6 +108,7 @@ export interface UserCustomModel {
   baseUrl: string
   modelId: string
   apiKey: string
+  modelType: 'text' | 'multimodal'
   maxTokens?: number
   temperature?: number
   isDefault?: boolean

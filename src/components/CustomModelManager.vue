@@ -59,6 +59,31 @@
               <input v-model="form.modelId" type="text" placeholder="如：gpt-4o" required />
             </div>
             <div class="cm-field">
+              <label>模型类型 <em>*</em></label>
+              <div class="cm-type-toggle">
+                <button
+                  type="button"
+                  class="cm-type-btn"
+                  :class="{ active: form.modelType === 'text' }"
+                  @click="form.modelType = 'text'"
+                >
+                  <span class="cm-type-icon">💬</span>
+                  <span class="cm-type-label">文本模型</span>
+                  <span class="cm-type-desc">纯语言对话</span>
+                </button>
+                <button
+                  type="button"
+                  class="cm-type-btn"
+                  :class="{ active: form.modelType === 'multimodal' }"
+                  @click="form.modelType = 'multimodal'"
+                >
+                  <span class="cm-type-icon">🖼️</span>
+                  <span class="cm-type-label">多模态模型</span>
+                  <span class="cm-type-desc">支持图像识别</span>
+                </button>
+              </div>
+            </div>
+            <div class="cm-field">
               <label>API Key <em v-if="!editingId">*</em></label>
               <div class="cm-pwd-row">
                 <input
@@ -127,6 +152,7 @@ const defaultForm = (): UserCustomModel => ({
   baseUrl: '',
   modelId: '',
   apiKey: '',
+  modelType: 'text',
   maxTokens: undefined,
   temperature: undefined
 })
@@ -144,6 +170,7 @@ const loadModels = async () => {
       protocolType: m.protocolType,
       baseUrl: m.baseUrl || '',
       modelId: m.modelId,
+      modelType: m.modelType || 'text',
       apiKey: m.apiKey || '',
       maxTokens: m.maxTokens,
       temperature: m.temperature,
@@ -461,6 +488,55 @@ onMounted(() => {
   transition: all 0.15s;
 }
 .cm-toggle-pwd:hover { color: #ccc; background: #2a2a36; }
+
+.cm-type-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.cm-type-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 10px 12px;
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: #18181f;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+.cm-type-btn:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: #1e1e28;
+  color: #bbb;
+}
+
+.cm-type-btn.active {
+  border-color: #6c5ce7;
+  background: rgba(108, 92, 231, 0.1);
+  color: #e0e0f0;
+  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.08);
+}
+
+.cm-type-icon {
+  font-size: 22px;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.cm-type-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cm-type-desc {
+  font-size: 11px;
+  opacity: 0.55;
+}
 
 .cm-form-actions,
 .cm-footer {

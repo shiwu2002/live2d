@@ -349,13 +349,24 @@ const initializeServices = async () => {
 /**
  * 将历史记录转为前端消息格式
  */
-const historyToMessage = (record: HistoryRecord): ExtendedChatMessage => ({
-  id: String(record.id),
-  type: record.messageType === 'image' ? 'IMAGES' : record.messageType.toUpperCase(),
-  content: record.content,
-  sender: record.sender,
-  timestamp: new Date(record.createTime).getTime()
-} as ExtendedChatMessage)
+const historyToMessage = (record: HistoryRecord): ExtendedChatMessage => {
+  if (record.messageType === 'image') {
+    return {
+      id: String(record.id),
+      type: 'IMAGES',
+      content: { urls: [record.content] },
+      sender: record.sender,
+      timestamp: new Date(record.createTime).getTime()
+    } as ExtendedChatMessage
+  }
+  return {
+    id: String(record.id),
+    type: record.messageType.toUpperCase(),
+    content: record.content,
+    sender: record.sender,
+    timestamp: new Date(record.createTime).getTime()
+  } as ExtendedChatMessage
+}
 
 /**
  * 加载聊天历史
