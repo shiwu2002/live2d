@@ -351,11 +351,11 @@ const initializeServices = async () => {
  */
 const historyToMessage = (record: HistoryRecord): ExtendedChatMessage => ({
   id: String(record.id),
-  type: record.messageType === 'image' ? 'IMAGES' : record.messageType.toUpperCase() as ExtendedChatMessage['type'],
+  type: record.messageType === 'image' ? 'IMAGES' : record.messageType.toUpperCase(),
   content: record.content,
   sender: record.sender,
   timestamp: new Date(record.createTime).getTime()
-})
+} as ExtendedChatMessage)
 
 /**
  * 加载聊天历史
