@@ -43,6 +43,13 @@
       @changed="handleCustomModelsChanged"
     />
 
+    <MemoryUpload
+      :visible="showMemoryUpload"
+      :userId="currentUser?.openid || ''"
+      :ai-session-id="wsConfig.aiSessionId"
+      @close="showMemoryUpload = false"
+    />
+
     <div v-if="discoveredModels.length > 0" class="pet-container desktop-pet">
       <div class="background-board" :class="{ 'hidden': !showBackground }">
         <div class="drag-handle-top-right" @mousedown="handleDragStart" title="拖拽移动窗口">
@@ -145,6 +152,15 @@
               </button>
               <button
                 class="dropdown-item"
+                @click="toggleMemoryUpload(); showMoreMenu = false"
+                :style="!isLoggedIn ? 'opacity:0.4' : ''"
+                title="对话记忆"
+              >
+                <span class="dropdown-emoji">📝</span>
+                <span>对话记忆</span>
+              </button>
+              <button
+                class="dropdown-item"
                 @click="playRandomMotion(); showMoreMenu = false"
                 title="随机动作"
               >
@@ -214,6 +230,7 @@ import VoiceCall from './components/VoiceCall.vue'
 import UserAuthModal from './components/UserAuthModal.vue'
 import CharacterSettings from './components/CharacterSettings.vue'
 import CustomModelManager from './components/CustomModelManager.vue'
+import MemoryUpload from './components/MemoryUpload.vue'
 import { autoModelConfig, getAutoModelIds, getValidAutoModelIds } from './config/auto-models'
 import { getChatConfig, generateSessionId } from './config'
 import { getWebSocketUrl, logEnvConfig } from './config'
@@ -347,6 +364,9 @@ const showCharacterSettings = ref(false)
 // 自定义模型管理窗口状态
 const showCustomModelManager = ref(false)
 
+// 记忆上传窗口状态
+const showMemoryUpload = ref(false)
+
 // 更多菜单下拉状态
 const showMoreMenu = ref(false)
 
@@ -363,6 +383,7 @@ const hasActiveInteractiveUI = () => {
     showUserAuthModal.value ||
     showCharacterSettings.value ||
     showCustomModelManager.value ||
+    showMemoryUpload.value ||
     showMoreMenu.value
   )
 }
@@ -423,7 +444,7 @@ const updateMousePenetration = async (api: any, getY: () => number) => {
 
 // 监听交互界面状态变化，立即更新穿透
 watch(
-  [showChat, showVoiceCall, showUserAuthModal, showCharacterSettings, showCustomModelManager, showMoreMenu],
+  [showChat, showVoiceCall, showUserAuthModal, showCharacterSettings, showCustomModelManager, showMemoryUpload, showMoreMenu],
   async () => {
     if (!isBackgroundHidden || !isDesktop.value) return
     const api = (window as any).electronAPI
@@ -528,6 +549,15 @@ const toggleCustomModelManager = () => {
     return
   }
   showCustomModelManager.value = !showCustomModelManager.value
+}
+
+// 切换记忆上传窗口
+const toggleMemoryUpload = () => {
+  if (!isLoggedIn.value) {
+    showMessage('请先登录', 'error')
+    return
+  }
+  showMemoryUpload.value = !showMemoryUpload.value
 }
 
 // 自定义模型变更回调
@@ -815,6 +845,8 @@ const handleClickOutside = (e: MouseEvent) => {
   overflow: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
 }
 
 .app-container.desktop-pet::-webkit-scrollbar {
@@ -994,6 +1026,7 @@ const handleClickOutside = (e: MouseEvent) => {
 .pet-model-area.desktop-pet {
   flex: 1;
   width: 100vw;
+  min-height: calc(100vh - 120px);
   height: auto;
   background: transparent !important;
   background-color: transparent !important;

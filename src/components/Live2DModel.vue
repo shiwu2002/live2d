@@ -333,10 +333,30 @@ const loadModel = async () => {
       const modelWidth = model.width
       const modelHeight = model.height
       const fillRatio = displayCfg.fillRatio ?? 0.8
-      const scaleX = (containerWidth * fillRatio) / modelWidth
-      const scaleY = (containerHeight * fillRatio) / modelHeight
-      const optimalScale = Math.min(scaleX, scaleY)
-      model.scale.set(displayCfg.defaultScale ?? optimalScale)
+
+      let optimalScale: number
+      if (displayCfg.defaultScale && displayCfg.defaultScale > 0) {
+        optimalScale = displayCfg.defaultScale
+        console.log('使用配置的默认缩放:', displayCfg.defaultScale)
+      } else if (modelWidth > 0 && modelHeight > 0) {
+        const scaleX = (containerWidth * fillRatio) / modelWidth
+        const scaleY = (containerHeight * fillRatio) / modelHeight
+        optimalScale = Math.min(scaleX, scaleY)
+
+        const MIN_SCALE = 0.01
+        const MAX_SCALE = 10
+        if (optimalScale < MIN_SCALE) {
+          console.warn(`计算的缩放过小 (${optimalScale.toFixed(6)})，使用最小值 ${MIN_SCALE}。模型尺寸: ${modelWidth}x${modelHeight}, 容器: ${containerWidth}x${containerHeight}`)
+          optimalScale = MIN_SCALE
+        } else if (optimalScale > MAX_SCALE) {
+          console.warn(`计算的缩放过大 (${optimalScale.toFixed(6)})，使用最大值 ${MAX_SCALE}`)
+          optimalScale = MAX_SCALE
+        }
+      } else {
+        optimalScale = 1
+      }
+
+      model.scale.set(optimalScale)
       model.anchor.set(displayCfg.anchorX ?? 0.5, displayCfg.anchorY ?? 0.5)
       model.x = displayCfg.positionX === 'center' ? containerWidth / 2
         : displayCfg.positionX === 'left' ? 0
@@ -423,10 +443,27 @@ const adjustModelToContainer = () => {
   const baseModelWidth = model.width / model.scale.x
   const baseModelHeight = model.height / model.scale.y
   const fillRatio = displayCfg.fillRatio ?? 0.8
-  const scaleX = (containerWidth * fillRatio) / baseModelWidth
-  const scaleY = (containerHeight * fillRatio) / baseModelHeight
-  const optimalScale = Math.min(scaleX, scaleY)
-  model.scale.set(displayCfg.defaultScale ?? optimalScale)
+
+  let optimalScale: number
+  if (displayCfg.defaultScale && displayCfg.defaultScale > 0) {
+    optimalScale = displayCfg.defaultScale
+  } else if (baseModelWidth > 0 && baseModelHeight > 0) {
+    const scaleX = (containerWidth * fillRatio) / baseModelWidth
+    const scaleY = (containerHeight * fillRatio) / baseModelHeight
+    optimalScale = Math.min(scaleX, scaleY)
+
+    const MIN_SCALE = 0.01
+    const MAX_SCALE = 10
+    if (optimalScale < MIN_SCALE) {
+      optimalScale = MIN_SCALE
+    } else if (optimalScale > MAX_SCALE) {
+      optimalScale = MAX_SCALE
+    }
+  } else {
+    optimalScale = 1
+  }
+
+  model.scale.set(optimalScale)
   model.x = displayCfg.positionX === 'center' ? containerWidth / 2
     : displayCfg.positionX === 'left' ? 0
     : displayCfg.positionX === 'right' ? containerWidth
@@ -599,6 +636,8 @@ defineExpose({
 
 onMounted(async () => {
   initPixiApp()
+
+  await waitForContainerReady()
   await loadModel()
   startRenderLoop()
 
@@ -617,6 +656,36 @@ onMounted(async () => {
     resizeObserver.observe(canvasContainer.value)
   }
 })
+
+const waitForContainerReady = (): Promise<void> => {
+  return new Promise((resolve) => {
+    const checkReady = () => {
+      if (!canvasContainer.value) {
+        resolve()
+        return
+      }
+
+      const rect = canvasContainer.value.getBoundingClientRect()
+      const width = Math.max(1, Math.floor(rect.width))
+      const height = Math.max(1, Math.floor(rect.height))
+
+      if (width > 10 && height > 10) {
+        console.log(`✅ 容器就绪: ${width}x${height}`)
+        resolve()
+        return
+      }
+
+      console.log(`⏳ 等待容器就绪... 当前: ${width}x${height}`)
+      requestAnimationFrame(checkReady)
+    }
+
+    setTimeout(() => {
+      resolve()
+    }, 5000)
+
+    requestAnimationFrame(checkReady)
+  })
+}
 
 onUnmounted(() => {
   window.removeEventListener('mousemove', handleMouseMove)
