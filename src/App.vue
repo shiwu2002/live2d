@@ -379,20 +379,6 @@ const handleAnimation = (command: Live2DAnimationCommand) => {
   live2dModelRef.value?.executeAnimation(command)
 }
 
-// 动作/表情下拉框选中的值
-const selectedAction = ref('')
-
-// 处理动作/表情选择
-const handleActionSelect = () => {
-  if (selectedAction.value === 'motion') {
-    playRandomMotion()
-  } else if (selectedAction.value === 'expression') {
-    changeExpression()
-  }
-  // 执行后重置为默认选项
-  selectedAction.value = ''
-}
-
 // 切换聊天窗口
 const toggleChat = () => {
   showChat.value = !showChat.value
