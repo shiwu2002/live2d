@@ -18,10 +18,14 @@
     </div>
 
     <!-- 聊天内容区域 -->
-    <div class="chat-body" v-show="!isMinimized" ref="chatBody">
+    <div class="chat-body" v-show="!isMinimized" ref="chatBody" @scroll="handleScroll">
       <div class="messages-container">
-        <div 
-          v-for="message in displayMessages" 
+        <!-- 历史加载状态 -->
+        <div v-if="isLoadingHistory" class="history-loading">加载历史记录中...</div>
+        <div v-else-if="!hasMoreHistory && messages.length > 0" class="history-end">— 已加载全部历史 —</div>
+
+        <div
+          v-for="message in displayMessages"
           :key="message.id"
           class="message-item"
           :class="[`message-${message.sender}`]"
@@ -49,17 +53,15 @@
           </div>
 
           <!-- 图片消息 -->
-          <div v-else-if="message.type === 'IMAGES'" class="message-bubble image-message">
-            <div class="image-grid">
-              <img 
-                v-for="(img, idx) in getImageUrls(message.content)" 
-                :key="idx"
-                :src="img" 
-                :alt="`图片${idx + 1}`"
-                @click="previewImage(img)"
-              />
-            </div>
-            <div class="message-time">{{ formatTime(message.timestamp ?? Date.now()) }}</div>
+          <div v-else-if="message.type === 'IMAGES'" class="image-message-wrapper">
+            <img
+              v-for="(img, idx) in getImageUrls(message.content)"
+              :key="idx"
+              :src="img"
+              :alt="`图片${idx + 1}`"
+              class="image-direct"
+              @click="previewImage(img)"
+            />
           </div>
 
           <!-- 控制消息 -->
@@ -112,6 +114,15 @@
 
       <!-- 文本聊天模式 -->
       <div v-else class="input-container">
+        <!-- 隐藏的图片文件选择器 -->
+        <input
+          ref="imageInputRef"
+          type="file"
+          accept="image/jpeg,image/png,image/gif,image/webp"
+          style="display: none"
+          @change="handleImageSelect"
+        />
+
         <textarea
           v-model="inputText"
           class="text-input"
@@ -121,26 +132,21 @@
           @keydown.shift.enter.exact="handleShiftEnter"
           :disabled="!isConnected"
         ></textarea>
-        
+
         <div class="input-actions">
-          <!-- 语音录制按钮 -->
-          <button 
-            class="action-btn voice-btn"
-            :class="{ 'recording': isRecording }"
-            @mousedown="startRecording"
-            @mouseup="stopRecording"
-            @mouseleave="cancelRecording"
-            @touchstart.prevent="startRecording"
-            @touchend.prevent="stopRecording"
-            :disabled="!isConnected || !voiceSupported"
-            :title="voiceSupported ? (isRecording ? '松开发送' : '按住说话') : '浏览器不支持录音'"
+          <!-- 图片上传按钮 -->
+          <button
+            class="action-btn image-btn"
+            @click="triggerImageSelect"
+            :disabled="!isConnected || isUploadingImage"
+            :title="isUploadingImage ? '上传中...' : '发送图片'"
           >
-            <span v-if="isRecording">🎙️</span>
-            <span v-else>🎤</span>
+            <span v-if="isUploadingImage" class="spinner"></span>
+            <img v-else src="../images/图片.png" class="image-btn-icon" alt="图片" />
           </button>
 
           <!-- 发送按钮 -->
-          <button 
+          <button
             class="action-btn send-btn"
             @click="sendTextMessage"
             :disabled="!isConnected || !inputText.trim()"
@@ -151,13 +157,23 @@
         </div>
       </div>
 
-      <!-- 录音提示 -->
-      <div v-if="isRecording" class="recording-indicator">
-        <span class="recording-dot"></span>
-        <span class="recording-text">正在录音...</span>
-        <span class="recording-time">{{ recordingTime }}s</span>
+      <!-- 图片预览区域 -->
+      <div v-if="imagePreviewUrl && !isUploadingImage" class="image-preview-bar">
+        <img :src="imagePreviewUrl" alt="预览" class="preview-thumb" />
+        <span class="preview-name">{{ selectedImageFile?.name ?? '' }}</span>
+        <button class="preview-send-btn" @click="sendImage" :disabled="!isConnected">
+          发送图片
+        </button>
+        <button class="preview-cancel-btn" @click="cancelImageSelect">✕</button>
       </div>
+
     </div>
+  </div>
+
+  <!-- 图片灯箱 -->
+  <div v-if="imageLightboxUrl" class="lightbox-overlay" @click="closeLightbox">
+    <img :src="imageLightboxUrl" class="lightbox-image" @click.stop />
+    <button class="lightbox-close" @click="closeLightbox">✕</button>
   </div>
 </template>
 
@@ -167,15 +183,17 @@ import { WebSocketService, type WebSocketConfig } from '../services/websocket'
 import type { ExtendedChatMessage } from '../types/chat'
 import type { Live2DAnimationCommand } from '../types/live2d'
 import { AudioRecorder, AudioPlayer, AudioUtils } from '../services/audio'
-import { 
-  getTextContent, 
-  getImageUrls, 
-  getControlText 
+import { uploadService } from '../services/uploadService'
+import { chatHistoryService, type HistoryRecord } from '../services/chatHistoryService'
+import {
+  getTextContent,
+  getImageUrls,
+  getControlText
 } from '../utils/message'
-import { 
-  formatTime, 
-  formatDuration, 
-  formatCallDuration 
+import {
+  formatTime,
+  formatDuration,
+  formatCallDuration
 } from '../utils/time'
 
 const props = withDefaults(defineProps<{
@@ -205,14 +223,20 @@ const messages = ref<ExtendedChatMessage[]>([])
 const inputText = ref('')
 const isConnected = ref(false)
 const isMinimized = ref(false)
-const isRecording = ref(false)
 const isPlayingVoice = ref(false)
 const currentPlayingId = ref<string | null>(null)
-const recordingTime = ref(0)
 const voiceSupported = ref(false)
 const isInVoiceCall = ref(false)
 const voiceCallDuration = ref(0)
 const isCleaningUp = ref(false)
+const imageInputRef = ref<HTMLInputElement | null>(null)
+const isUploadingImage = ref(false)
+const selectedImageFile = ref<File | null>(null)
+const imagePreviewUrl = ref<string>('')
+const imageLightboxUrl = ref<string>('')
+const isLoadingHistory = ref(false)
+const hasMoreHistory = ref(true)
+const historyNextId = ref<number | undefined>(undefined)
 
 // 计算属性：过滤只显示聊天相关的消息（TEXT、IMAGES和AUDIO）
 const displayMessages = computed<ExtendedChatMessage[]>(() => {
@@ -268,7 +292,6 @@ const endDrag = () => {
 }
 
 // 计时器
-let recordingTimer: number | null = null
 let voiceCallTimer: number | null = null
 
 // 计算属性
@@ -314,9 +337,70 @@ const initializeServices = async () => {
     }
 
     console.log('聊天服务初始化成功')
+
+    // 加载历史记录
+    loadHistory()
   } catch (error) {
     console.error('初始化聊天服务失败:', error)
     alert('连接失败，请检查 WebSocket 服务器地址')
+  }
+}
+
+/**
+ * 将历史记录转为前端消息格式
+ */
+const historyToMessage = (record: HistoryRecord): ExtendedChatMessage => ({
+  id: String(record.id),
+  type: record.messageType === 'image' ? 'IMAGES' : record.messageType.toUpperCase() as ExtendedChatMessage['type'],
+  content: record.content,
+  sender: record.sender,
+  timestamp: new Date(record.createTime).getTime()
+})
+
+/**
+ * 加载聊天历史
+ */
+const loadHistory = async () => {
+  if (!props.openid || isLoadingHistory.value || !hasMoreHistory.value) return
+
+  isLoadingHistory.value = true
+  try {
+    const page = await chatHistoryService.fetchHistory(
+      props.openid,
+      historyNextId.value,
+      20
+    )
+    if (page.records.length === 0) {
+      hasMoreHistory.value = false
+      return
+    }
+
+    const historyMessages = page.records.map(historyToMessage).reverse()
+    messages.value.unshift(...historyMessages)
+
+    historyNextId.value = page.nextId ?? undefined
+    if (!page.nextId) hasMoreHistory.value = false
+  } catch (error) {
+    console.error('加载聊天历史失败:', error)
+  } finally {
+    isLoadingHistory.value = false
+  }
+}
+
+/**
+ * 处理滚动（触顶加载更多历史）
+ */
+const handleScroll = () => {
+  if (!chatBody.value || isLoadingHistory.value || !hasMoreHistory.value) return
+  if (chatBody.value.scrollTop <= 30) {
+    const prevHeight = chatBody.value.scrollHeight
+    loadHistory().then(() => {
+      nextTick(() => {
+        if (chatBody.value) {
+          chatBody.value.scrollTop = chatBody.value.scrollHeight - prevHeight
+        }
+      })
+    })
   }
 }
 
@@ -369,10 +453,112 @@ const handleError = (error: Error) => {
 }
 
 /**
- * 预览图片
+ * 预览图片（灯箱）
  */
 const previewImage = (url: string) => {
-  window.open(url, '_blank')
+  imageLightboxUrl.value = url
+}
+
+/**
+ * 关闭灯箱
+ */
+const closeLightbox = () => {
+  imageLightboxUrl.value = ''
+}
+
+/**
+ * 触发图片选择
+ */
+const triggerImageSelect = () => {
+  imageInputRef.value?.click()
+}
+
+/**
+ * 处理图片选择
+ */
+const handleImageSelect = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  // 校验
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+  if (!allowedTypes.includes(file.type)) {
+    alert('不支持的图片格式，请选择 JPG/PNG/GIF/WebP 格式')
+    return
+  }
+  if (file.size > 50 * 1024 * 1024) {
+    alert('图片大小不能超过 50MB')
+    return
+  }
+
+  selectedImageFile.value = file
+  imagePreviewUrl.value = URL.createObjectURL(file)
+  // 重置 input 以便重复选择同一文件
+  input.value = ''
+}
+
+/**
+ * 压缩图片（超过 2MB 时缩至 1920px 宽以内）
+ */
+const compressImage = async (file: File): Promise<Blob> => {
+  if (file.size < 2 * 1024 * 1024) return file
+
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      let { width, height } = img
+      if (width > 1920) {
+        height = Math.round((height * 1920) / width)
+        width = 1920
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, width, height)
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error('压缩失败'))),
+        'image/jpeg',
+        0.85
+      )
+    }
+    img.onerror = () => reject(new Error('图片加载失败'))
+    img.src = URL.createObjectURL(file)
+  })
+}
+
+/**
+ * 发送图片（上传 → WebSocket）
+ */
+const sendImage = async () => {
+  if (!selectedImageFile.value || !wsService || !isConnected.value || isUploadingImage.value) return
+
+  isUploadingImage.value = true
+  try {
+    const compressed = await compressImage(selectedImageFile.value)
+    const result = await uploadService.uploadImage(
+      compressed instanceof File ? compressed : new File([compressed], selectedImageFile.value.name || 'image.jpg', { type: 'image/jpeg' })
+    )
+    if (result.code !== 200) throw new Error(result.msg || '上传失败')
+
+    wsService.sendImages([result.data!])
+    cancelImageSelect()
+  } catch (error) {
+    console.error('发送图片失败:', error)
+    alert(`发送图片失败: ${error instanceof Error ? error.message : '未知错误'}`)
+  } finally {
+    isUploadingImage.value = false
+  }
+}
+
+/**
+ * 取消图片选择
+ */
+const cancelImageSelect = () => {
+  if (imagePreviewUrl.value) URL.revokeObjectURL(imagePreviewUrl.value)
+  selectedImageFile.value = null
+  imagePreviewUrl.value = ''
 }
 
 /**
@@ -405,95 +591,6 @@ const handleShiftEnter = (event: KeyboardEvent) => {
   nextTick(() => {
     target.selectionStart = target.selectionEnd = start + 1
   })
-}
-
-/**
- * 开始录音
- */
-const startRecording = async () => {
-  if (!audioRecorder || !wsService || !isConnected.value || isRecording.value) {
-    return
-  }
-
-  try {
-    // 初始化录音器（如果还没初始化）
-    if (audioRecorder.getState() === 'inactive') {
-      await audioRecorder.initialize()
-    }
-
-    // 开始录音
-    audioRecorder.start()
-    isRecording.value = true
-    recordingTime.value = 0
-
-    // 启动计时器
-    recordingTimer = window.setInterval(() => {
-      recordingTime.value++
-    }, 1000)
-
-    console.log('开始录音')
-  } catch (error) {
-    console.error('启动录音失败:', error)
-    alert('无法访问麦克风，请检查权限设置')
-    isRecording.value = false
-  }
-}
-
-/**
- * 停止录音并发送
- */
-const stopRecording = async () => {
-  if (!audioRecorder || !wsService || !isRecording.value) {
-    return
-  }
-
-  try {
-    // 停止计时器
-    if (recordingTimer !== null) {
-      clearInterval(recordingTimer)
-      recordingTimer = null
-    }
-
-    // 停止录音
-    const { pcmData, duration } = audioRecorder.stop()
-    isRecording.value = false
-
-    // 发送语音消息
-    if (duration > 500) { // 至少录音0.5秒
-      wsService.sendAudio(pcmData)
-      console.log('语音消息已发送')
-    } else {
-      console.log('录音时间太短，已取消')
-    }
-  } catch (error) {
-    console.error('停止录音失败:', error)
-    isRecording.value = false
-  }
-}
-
-/**
- * 取消录音
- */
-const cancelRecording = () => {
-  if (!isRecording.value) {
-    return
-  }
-
-  if (recordingTimer !== null) {
-    clearInterval(recordingTimer)
-    recordingTimer = null
-  }
-
-  if (audioRecorder) {
-    try {
-      audioRecorder.stop()
-    } catch (error) {
-      console.error(error)
-    }
-  }
-
-  isRecording.value = false
-  console.log('录音已取消')
 }
 
 /**
@@ -652,12 +749,6 @@ const cleanupConnection = () => {
   isCleaningUp.value = true
   
   try {
-    // 清理计时器
-    if (recordingTimer !== null) {
-      clearInterval(recordingTimer)
-      recordingTimer = null
-    }
-
     if (voiceCallTimer !== null) {
       clearInterval(voiceCallTimer)
       voiceCallTimer = null
@@ -830,6 +921,15 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
+.history-loading,
+.history-end {
+  text-align: center;
+  font-size: 12px;
+  color: #C44569;
+  padding: 8px 0;
+  opacity: 0.7;
+}
+
 .message-item {
   display: flex;
   animation: slideIn 0.3s ease;
@@ -931,27 +1031,20 @@ onBeforeUnmount(() => {
   margin-bottom: 2px;
 }
 
-.image-message {
-  max-width: 80%;
+.image-message-wrapper {
+  max-width: 70%;
 }
 
-.image-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.image-grid img {
+.image-direct {
   width: 100%;
-  height: auto;
   border-radius: 10px;
   cursor: pointer;
   transition: transform 0.2s ease;
+  display: block;
 }
 
-.image-grid img:hover {
-  transform: scale(1.05);
+.image-direct:hover {
+  transform: scale(1.02);
 }
 
 .control-message,
@@ -1072,47 +1165,148 @@ onBeforeUnmount(() => {
   box-shadow: 0 4px 12px rgba(255, 107, 157, 0.3);
 }
 
+.image-btn {
+  background: #FFF0F5;
+  color: #FF6B9D;
+  position: relative;
+}
+
+.image-btn:hover:not(:disabled) {
+  background: #FFE0EB;
+  transform: scale(1.05);
+}
+
+.image-btn-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 107, 157, 0.2);
+  border-top-color: #FF6B9D;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.image-preview-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #FFF5F9;
+  border-top: 1px solid #FFE0EB;
+}
+
+.preview-thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #FFD0E0;
+}
+
+.preview-name {
+  flex: 1;
+  font-size: 12px;
+  color: #C44569;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-send-btn {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
+  color: white;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.preview-send-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(255, 107, 157, 0.3);
+}
+
+.preview-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.preview-cancel-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 107, 157, 0.1);
+  color: #C44569;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-cancel-btn:hover {
+  background: rgba(255, 107, 157, 0.2);
+}
+
+/* 图片灯箱 */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.lightbox-image {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 12px;
+  cursor: default;
+}
+
+.lightbox-close {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
 .action-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none !important;
-}
-
-.recording-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-  padding: 8px 12px;
-  background: #FFF0F5;
-  border-radius: 10px;
-  color: #FF6B9D;
-  font-size: 13px;
-}
-
-.recording-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #FF6B9D;
-  animation: blink 1s infinite;
-}
-
-@keyframes blink {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.3;
-  }
-}
-
-.recording-text {
-  flex: 1;
-}
-
-.recording-time {
-  font-weight: 600;
 }
 
 .voice-call-controls {
