@@ -9,5 +9,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   endDrag: () => ipcRenderer.send('end-drag'),
   minimizeWindow: () => ipcRenderer.invoke('minimize-window'),
   closeWindow: () => ipcRenderer.invoke('close-window'),
-  setIgnoreMouseEvents: (ignore, options) => ipcRenderer.invoke('set-ignore-mouse-events', ignore, options)
+  // 快速路径（fire-and-forget）
+  setIgnoreMouseEvents: (ignore, options) => ipcRenderer.send('set-ignore-mouse-events', ignore, options),
+  // 启停主进程轮询（安全网）
+  setBackgroundHidden: (hidden) => ipcRenderer.send('set-background-hidden', hidden),
+  focusWindow: () => ipcRenderer.send('focus-window'),
+  // 主进程焦点事件
+  onWindowBlurred: (callback) => {
+    ipcRenderer.on('window-blurred', callback)
+  },
+  onWindowFocused: (callback) => {
+    ipcRenderer.on('window-focused', callback)
+  }
 })

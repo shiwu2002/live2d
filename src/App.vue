@@ -372,8 +372,13 @@ const showMoreMenu = ref(false)
 
 // 背景板显示状态
 const showBackground = ref(true)
-let isBackgroundHidden = false
-let mouseMoveListenerForPenetration: ((e: MouseEvent) => void) | null = null
+const isBackgroundHidden = ref(false)
+
+// 鼠标穿透：状态缓存 + 启用防抖（禁用立即生效，启用延迟 250ms）
+let mousePenetrationListener: ((e: MouseEvent) => void) | null = null
+let lastIgnoreState: boolean | null = null
+let enableIgnoreTimer: ReturnType<typeof setTimeout> | null = null
+const ENABLE_IGNORE_DELAY_MS = 250
 
 // 检查是否有任何交互界面正在显示
 const hasActiveInteractiveUI = () => {
@@ -388,70 +393,112 @@ const hasActiveInteractiveUI = () => {
   )
 }
 
+const getApi = () => (window as any).electronAPI
+
+// 清除启用穿透的防抖定时器
+const clearEnableIgnoreTimer = () => {
+  if (enableIgnoreTimer) {
+    clearTimeout(enableIgnoreTimer)
+    enableIgnoreTimer = null
+  }
+}
+
+// 仅当穿透状态需改变时才调用（fire-and-forget）
+const applyMouseIgnore = (ignore: boolean) => {
+  if (ignore === lastIgnoreState) return
+  lastIgnoreState = ignore
+  getApi()?.setIgnoreMouseEvents?.(ignore, { forward: true })
+}
+
+// 根据鼠标 Y 坐标判断是否在工具栏区域（不穿透），底部 140px
+const isInToolbarZone = (y: number) => y > window.innerHeight - 140
+
+const syncMouseIgnore = (clientY: number) => {
+  const inToolbar = isInToolbarZone(clientY)
+  const hasUI = hasActiveInteractiveUI()
+
+  if (inToolbar || hasUI) {
+    // 进入工具栏区域 / 有 UI 打开 → 立即禁用穿透
+    clearEnableIgnoreTimer()
+    applyMouseIgnore(false)
+  } else {
+    // 离开工具栏区域且无 UI → 延迟启用穿透（防止从模型区快速滑向工具栏时误穿透）
+    if (!enableIgnoreTimer) {
+      enableIgnoreTimer = setTimeout(() => {
+        enableIgnoreTimer = null
+        // 再次确认鼠标仍在模型区域且无 UI
+        if (!hasActiveInteractiveUI()) {
+          applyMouseIgnore(true)
+        }
+      }, ENABLE_IGNORE_DELAY_MS)
+    }
+  }
+}
+
 // 切换背景板显示
 const toggleBackground = async () => {
   showBackground.value = !showBackground.value
-  isBackgroundHidden = !showBackground.value
+  isBackgroundHidden.value = !showBackground.value
   console.log(`背景板: ${showBackground.value ? '显示' : '隐藏'}`)
 
   if (isDesktop.value) {
-    try {
-      const api = (window as any).electronAPI
-      if (!api?.setIgnoreMouseEvents) return
-
-      if (isBackgroundHidden) {
-        // 隐藏背景时：添加鼠标移动监听，动态控制穿透
-        mouseMoveListenerForPenetration = (e: MouseEvent) => handleMousePositionForPenetration(e, api)
-        document.addEventListener('mousemove', mouseMoveListenerForPenetration)
-        // 初始设置穿透
-        await updateMousePenetration(api, () => window.innerHeight - 40)
-      } else {
-        // 显示背景时：移除监听并关闭穿透
-        if (mouseMoveListenerForPenetration) {
-          document.removeEventListener('mousemove', mouseMoveListenerForPenetration)
-          mouseMoveListenerForPenetration = null
-        }
-        await api.setIgnoreMouseEvents(false)
+    const api = getApi()
+    if (isBackgroundHidden.value) {
+      // 背景隐藏：启动 mousemove 快速路径 + 主进程轮询安全网
+      if (!mousePenetrationListener) {
+        mousePenetrationListener = (e: MouseEvent) => syncMouseIgnore(e.clientY)
+        document.addEventListener('mousemove', mousePenetrationListener)
       }
-    } catch (error) {
-      console.warn('设置鼠标穿透失败:', error)
+      // 通知主进程启动轮询（安全网：不依赖渲染进程事件/焦点）
+      api?.setBackgroundHidden?.(true)
+      // 刚点击按钮，鼠标在工具栏区域 → 不穿透
+      applyMouseIgnore(false)
+    } else {
+      // 背景显示：停止主进程轮询，移除快速路径监听，关闭穿透
+      api?.setBackgroundHidden?.(false)
+      clearEnableIgnoreTimer()
+      if (mousePenetrationListener) {
+        document.removeEventListener('mousemove', mousePenetrationListener)
+        mousePenetrationListener = null
+      }
+      lastIgnoreState = null
+      applyMouseIgnore(false)
     }
   }
 }
 
-// 根据鼠标位置更新穿透状态
-const handleMousePositionForPenetration = async (e: MouseEvent, api: any) => {
-  if (!isBackgroundHidden || !isDesktop.value) return
-  await updateMousePenetration(api, () => e.clientY)
+// 焦点管理：使用主进程 BrowserWindow blur/focus（快速恢复）
+// 失焦时（用户点击穿透到桌面）→ 立即关闭穿透
+// 主进程轮询作为安全网：即使此事件未触发，也会在 100ms 内修正穿透状态
+const onMainWindowBlurred = () => {
+  if (!isDesktop.value || !isBackgroundHidden.value) return
+  lastIgnoreState = null
+  applyMouseIgnore(false)
 }
 
-const updateMousePenetration = async (api: any, getY: () => number) => {
-  try {
-    const y = getY()
-    const toolbarHeight = 80 // 工具栏区域高度（底部）
-    const windowHeight = window.innerHeight
-    // 如果鼠标在工具栏区域（底部），不穿透；否则穿透
-    const inToolbarArea = y > windowHeight - toolbarHeight
-    // 如果有交互界面显示，也不穿透
-    const hasUI = hasActiveInteractiveUI()
-    // 只有在非工具栏区域且无交互界面时才穿透
-    const shouldIgnore = !inToolbarArea && !hasUI
-    await api.setIgnoreMouseEvents(shouldIgnore, { forward: true })
-  } catch (error) {
-    console.warn('更新鼠标穿透失败:', error)
+const onMainWindowFocused = () => {
+  if (!isDesktop.value || !isBackgroundHidden.value) return
+  if (hasActiveInteractiveUI()) {
+    applyMouseIgnore(false)
+    return
   }
+  // 没有 UI 且背景隐藏：等 mousemove 同步正确穿透状态
+  // 不急于启用穿透，避免刚拿回焦点时误穿透
 }
 
-// 监听交互界面状态变化，立即更新穿透
+// 监听交互界面状态变化
 watch(
   [showChat, showVoiceCall, showUserAuthModal, showCharacterSettings, showCustomModelManager, showMemoryUpload, showMoreMenu],
-  async () => {
-    if (!isBackgroundHidden || !isDesktop.value) return
-    const api = (window as any).electronAPI
-    if (api?.setIgnoreMouseEvents) {
-      await updateMousePenetration(api, () => window.innerHeight - 40) // 假设在工具栏区域
-      console.log('交互界面状态变化，已更新穿透:', hasActiveInteractiveUI())
+  () => {
+    if (!isDesktop.value) return
+    if (hasActiveInteractiveUI()) {
+      applyMouseIgnore(false)
+      console.log('交互界面打开，已禁用穿透')
+    } else if (isBackgroundHidden.value && !mousePenetrationListener) {
+      // UI 全关且背景隐藏但没有监听 → 异常状态，启用穿透
+      applyMouseIgnore(true)
     }
+    // 正常情况：UI 全关且背景隐藏 → mousemove 监听器会同步正确状态
   }
 )
 
@@ -777,6 +824,10 @@ onMounted(async () => {
     } catch (e) {
       console.warn('⚠️ 设置窗口大小失败:', e)
     }
+    // 窗口焦点管理：使用主进程 BrowserWindow blur/focus（比渲染进程 window.blur 更可靠）
+    const api = getApi()
+    api?.onWindowBlurred?.(() => onMainWindowBlurred())
+    api?.onWindowFocused?.(() => onMainWindowFocused())
   }
 
   ;(async () => {
@@ -815,10 +866,10 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('resize', updateIsMobile)
   document.removeEventListener('click', handleClickOutside)
-  // 清理鼠标穿透监听器
-  if (mouseMoveListenerForPenetration) {
-    document.removeEventListener('mousemove', mouseMoveListenerForPenetration)
-    mouseMoveListenerForPenetration = null
+  clearEnableIgnoreTimer()
+  if (mousePenetrationListener) {
+    document.removeEventListener('mousemove', mousePenetrationListener)
+    mousePenetrationListener = null
   }
 })
 
