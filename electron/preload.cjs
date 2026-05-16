@@ -8,5 +8,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dragMove: (dx, dy) => ipcRenderer.send('drag-move', dx, dy),
   endDrag: () => ipcRenderer.send('end-drag'),
   minimizeWindow: () => ipcRenderer.invoke('minimize-window'),
-  closeWindow: () => ipcRenderer.invoke('close-window')
+  closeWindow: () => ipcRenderer.invoke('close-window'),
+  setIgnoreMouseEvents: (ignore, options) => ipcRenderer.invoke('set-ignore-mouse-events', ignore, options)
 })

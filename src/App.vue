@@ -44,6 +44,7 @@
     />
 
     <div v-if="discoveredModels.length > 0" class="pet-container desktop-pet">
+      <div class="background-board" :class="{ 'hidden': !showBackground }"></div>
       <div class="pet-model-area desktop-pet">
         <div class="drag-handle" @mousedown="handleDragStart" title="拖拽移动窗口">
           <img src="./images/移动.png" class="drag-icon" alt="拖拽" />
@@ -82,6 +83,14 @@
           </button>
           <button class="control-btn" @click="toggleVoiceCall" title="语音">
             <img :src="iconVoice" alt="语音" class="btn-icon" />
+          </button>
+          <button
+            class="control-btn background-btn"
+            :class="{ 'active': showBackground }"
+            @click="toggleBackground"
+            :title="showBackground ? '隐藏背景板' : '显示背景板'"
+          >
+            <span class="background-icon">🎨</span>
           </button>
 
           <div class="more-menu-wrapper">
@@ -313,6 +322,90 @@ const showCustomModelManager = ref(false)
 
 // 更多菜单下拉状态
 const showMoreMenu = ref(false)
+
+// 背景板显示状态
+const showBackground = ref(true)
+let isBackgroundHidden = false
+let mouseMoveListenerForPenetration: ((e: MouseEvent) => void) | null = null
+
+// 检查是否有任何交互界面正在显示
+const hasActiveInteractiveUI = () => {
+  return (
+    showChat.value ||
+    showVoiceCall.value ||
+    showUserAuthModal.value ||
+    showCharacterSettings.value ||
+    showCustomModelManager.value ||
+    showMoreMenu.value
+  )
+}
+
+// 切换背景板显示
+const toggleBackground = async () => {
+  showBackground.value = !showBackground.value
+  isBackgroundHidden = !showBackground.value
+  console.log(`背景板: ${showBackground.value ? '显示' : '隐藏'}`)
+
+  if (isDesktop.value) {
+    try {
+      const api = (window as any).electronAPI
+      if (!api?.setIgnoreMouseEvents) return
+
+      if (isBackgroundHidden) {
+        // 隐藏背景时：添加鼠标移动监听，动态控制穿透
+        mouseMoveListenerForPenetration = (e: MouseEvent) => handleMousePositionForPenetration(e, api)
+        document.addEventListener('mousemove', mouseMoveListenerForPenetration)
+        // 初始设置穿透
+        await updateMousePenetration(api, () => window.innerHeight - 40)
+      } else {
+        // 显示背景时：移除监听并关闭穿透
+        if (mouseMoveListenerForPenetration) {
+          document.removeEventListener('mousemove', mouseMoveListenerForPenetration)
+          mouseMoveListenerForPenetration = null
+        }
+        await api.setIgnoreMouseEvents(false)
+      }
+    } catch (error) {
+      console.warn('设置鼠标穿透失败:', error)
+    }
+  }
+}
+
+// 根据鼠标位置更新穿透状态
+const handleMousePositionForPenetration = async (e: MouseEvent, api: any) => {
+  if (!isBackgroundHidden || !isDesktop.value) return
+  await updateMousePenetration(api, () => e.clientY)
+}
+
+const updateMousePenetration = async (api: any, getY: () => number) => {
+  try {
+    const y = getY()
+    const toolbarHeight = 80 // 工具栏区域高度（底部）
+    const windowHeight = window.innerHeight
+    // 如果鼠标在工具栏区域（底部），不穿透；否则穿透
+    const inToolbarArea = y > windowHeight - toolbarHeight
+    // 如果有交互界面显示，也不穿透
+    const hasUI = hasActiveInteractiveUI()
+    // 只有在非工具栏区域且无交互界面时才穿透
+    const shouldIgnore = !inToolbarArea && !hasUI
+    await api.setIgnoreMouseEvents(shouldIgnore, { forward: true })
+  } catch (error) {
+    console.warn('更新鼠标穿透失败:', error)
+  }
+}
+
+// 监听交互界面状态变化，立即更新穿透
+watch(
+  [showChat, showVoiceCall, showUserAuthModal, showCharacterSettings, showCustomModelManager, showMoreMenu],
+  async () => {
+    if (!isBackgroundHidden || !isDesktop.value) return
+    const api = (window as any).electronAPI
+    if (api?.setIgnoreMouseEvents) {
+      await updateMousePenetration(api, () => window.innerHeight - 40) // 假设在工具栏区域
+      console.log('交互界面状态变化，已更新穿透:', hasActiveInteractiveUI())
+    }
+  }
+)
 
 // 用户登录状态
 const isLoggedIn = ref(false)
@@ -669,6 +762,11 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('resize', updateIsMobile)
   document.removeEventListener('click', handleClickOutside)
+  // 清理鼠标穿透监听器
+  if (mouseMoveListenerForPenetration) {
+    document.removeEventListener('mousemove', mouseMoveListenerForPenetration)
+    mouseMoveListenerForPenetration = null
+  }
 })
 
 const handleClickOutside = (e: MouseEvent) => {
@@ -732,6 +830,27 @@ const handleClickOutside = (e: MouseEvent) => {
   flex-direction: column;
   justify-content: flex-end;
   align-items: center;
+  position: relative;
+}
+
+.background-board {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(135deg, #FFB6C1 0%, #FFC0CB 50%, #FFCCD5 100%);
+  border-radius: 0;
+  z-index: -1;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.background-board.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .pet-container.desktop-pet:hover {
@@ -755,6 +874,8 @@ const handleClickOutside = (e: MouseEvent) => {
   background-color: transparent !important;
   background-image: none !important;
   cursor: default;
+  position: relative;
+  z-index: 1;
 }
 
 .pet-model-area.desktop-pet:active {
@@ -907,6 +1028,20 @@ const handleClickOutside = (e: MouseEvent) => {
 
 .logout-btn {
   background: linear-gradient(135deg, #E84393 0%, #C44569 100%);
+}
+
+.background-btn {
+  background: linear-gradient(135deg, #FFB6C1 0%, #FF69B4 100%);
+}
+
+.background-btn.active {
+  background: linear-gradient(135deg, #FF69B4 0%, #FF1493 100%);
+  box-shadow: 0 4px 16px rgba(255, 20, 147, 0.4);
+}
+
+.background-icon {
+  font-size: 20px;
+  line-height: 1;
 }
 
 .more-menu-wrapper {

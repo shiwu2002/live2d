@@ -8,5 +8,6 @@ interface Window {
     endDrag: () => void
     minimizeWindow: () => Promise<void>
     closeWindow: () => Promise<void>
+    setIgnoreMouseEvents: (ignore: boolean, options?: { forward?: boolean }) => Promise<void>
   }
 }

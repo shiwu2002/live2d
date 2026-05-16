@@ -80,3 +80,9 @@ ipcMain.handle('minimize-window', () => {
 ipcMain.handle('close-window', () => {
   mainWindow?.close()
 })
+
+ipcMain.handle('set-ignore-mouse-events', (_event, ignore, options = {}) => {
+  if (mainWindow) {
+    mainWindow.setIgnoreMouseEvents(ignore, options)
+  }
+})
