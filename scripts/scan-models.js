@@ -160,7 +160,7 @@ export const autoModelConfig: Record<string, ModelConfig> = {\n`
 
   sortedModels.forEach((model, index) => {
     // 使用 Vite base 路径生成完整路径
-    const fullPath = `${basePath}/model/${model.relativePath}`
+    const fullPath = `model/${model.relativePath}`
     
     content += `  ${model.id}: {\n`
     content += `    name: '${model.name}',\n`

@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git merge *)",
+      "WebSearch",
+      "Bash(node -e \"try{require.resolve\\('cross-env'\\);console.log\\('installed'\\)}catch\\(e\\){console.log\\('not found'\\)}\")",
+      "Bash(npx vite *)",
+      "Bash(npx -y image-size-cli \"e:\\\\vue\\\\live2d\\\\public\\\\icon.ico\")",
+      "Bash(python -c \"from PIL import Image; img=Image.open\\(r'e:\\\\vue\\\\live2d\\\\public\\\\icon.ico'\\); print\\(img.size, img.info\\)\")",
+      "Bash(python -c \"from PIL import Image; img=Image.open\\(r'e:\\\\vue\\\\live2d\\\\public\\\\icon.ico'\\); print\\('Size:', img.size\\); [print\\(f'  frame {i}: {img.size}'\\) for i in range\\(getattr\\(img, 'n_frames', 1\\)\\)]\")",
+      "Bash(python -c ' *)"
+    ]
+  }
+}
