@@ -77,8 +77,8 @@
 
         <!-- 空状态提示 -->
         <div v-if="displayMessages.length === 0" class="empty-state">
-          <div class="empty-icon">💬</div>
-          <div class="empty-text">暂无消息</div>
+          <div class="empty-icon">💕</div>
+        <div class="empty-text">暂无消息，开始聊天吧~</div>
         </div>
       </div>
     </div>
@@ -115,7 +115,7 @@
         <textarea
           v-model="inputText"
           class="text-input"
-          placeholder="输入消息..."
+          placeholder="说点什么吧~"
           rows="1"
           @keydown.enter.exact.prevent="sendTextMessage"
           @keydown.shift.enter.exact="handleShiftEnter"
@@ -734,13 +734,14 @@ onBeforeUnmount(() => {
   width: 380px;
   height: 520px;
   background: white;
-  border-radius: 16px;
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25);
+  border-radius: 20px;
+  box-shadow: 0 12px 48px rgba(255, 107, 157, 0.2);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   z-index: 1001;
   transition: box-shadow 0.2s ease, transform 0.2s ease;
+  border: 1.5px solid rgba(255, 107, 157, 0.15);
 }
 
 .chat-window.minimized {
@@ -756,7 +757,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   align-items: center;
   padding: 16px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
   color: white;
   user-select: none;
 }
@@ -776,8 +777,8 @@ onBeforeUnmount(() => {
 }
 
 .status-dot.connected {
-  background: #4caf50;
-  box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+  background: #FF8A9E;
+  box-shadow: 0 0 8px rgba(255, 138, 158, 0.6);
 }
 
 .header-title {
@@ -801,7 +802,7 @@ onBeforeUnmount(() => {
   border: none;
   background: rgba(255, 255, 255, 0.2);
   color: white;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 16px;
   display: flex;
@@ -818,7 +819,7 @@ onBeforeUnmount(() => {
   flex: 1;
   overflow-y: auto;
   padding: 16px;
-  background: #f5f5f5;
+  background: #FFF5F9;
   min-height: 300px;
   max-height: 400px;
 }
@@ -857,20 +858,27 @@ onBeforeUnmount(() => {
 .message-bubble {
   max-width: 70%;
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: 16px;
   background: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(255, 107, 157, 0.1);
 }
 
 .message-user .message-bubble {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
   color: white;
+  border-radius: 16px 16px 4px 16px;
+}
+
+.message-other .message-bubble,
+.message-ai .message-bubble {
+  border-radius: 16px 16px 16px 4px;
+  border: 1px solid #FFE0EB;
 }
 
 .text-message .message-content {
   word-wrap: break-word;
   white-space: pre-wrap;
-  line-height: 1.4;
+  line-height: 1.5;
   margin-bottom: 4px;
 }
 
@@ -891,7 +899,7 @@ onBeforeUnmount(() => {
   width: 36px;
   height: 36px;
   border: none;
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(255, 107, 157, 0.1);
   border-radius: 50%;
   cursor: pointer;
   font-size: 14px;
@@ -937,7 +945,7 @@ onBeforeUnmount(() => {
 .image-grid img {
   width: 100%;
   height: auto;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
   transition: transform 0.2s ease;
 }
@@ -948,14 +956,14 @@ onBeforeUnmount(() => {
 
 .control-message,
 .error-message {
-  background: #f0f0f0;
-  color: #666;
+  background: #FFF0F5;
+  color: #C44569;
   font-size: 13px;
 }
 
 .error-message {
-  background: #ffebee;
-  color: #c62828;
+  background: #FFE0EB;
+  color: #C44569;
 }
 
 .empty-state {
@@ -964,7 +972,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   padding: 60px 20px;
-  color: #999;
+  color: #FF8A9E;
 }
 
 .empty-icon {
@@ -974,12 +982,13 @@ onBeforeUnmount(() => {
 
 .empty-text {
   font-size: 14px;
+  color: #C44569;
 }
 
 .chat-footer {
   padding: 16px;
   background: white;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid #FFE0EB;
 }
 
 .input-container {
@@ -989,19 +998,20 @@ onBeforeUnmount(() => {
 
 .text-input {
   flex: 1;
-  padding: 10px 12px;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
+  padding: 10px 14px;
+  border: 2px solid #FFD0E0;
+  border-radius: 12px;
   font-size: 14px;
   font-family: inherit;
   resize: none;
   outline: none;
   transition: border-color 0.2s ease;
   max-height: 100px;
+  background: #FFF5F9;
 }
 
 .text-input:focus {
-  border-color: #667eea;
+  border-color: #FF6B9D;
 }
 
 .text-input:disabled {
@@ -1018,7 +1028,7 @@ onBeforeUnmount(() => {
   width: 44px;
   height: 44px;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
   font-size: 20px;
   display: flex;
@@ -1028,17 +1038,17 @@ onBeforeUnmount(() => {
 }
 
 .voice-btn {
-  background: #f5f5f5;
-  color: #666;
+  background: #FFF0F5;
+  color: #FF6B9D;
 }
 
 .voice-btn:hover:not(:disabled) {
-  background: #e0e0e0;
+  background: #FFE0EB;
   transform: scale(1.05);
 }
 
 .voice-btn.recording {
-  background: #ff4444;
+  background: #FF6B9D;
   color: white;
   animation: pulse 1s infinite;
 }
@@ -1053,13 +1063,13 @@ onBeforeUnmount(() => {
 }
 
 .send-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
   color: white;
 }
 
 .send-btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 12px rgba(255, 107, 157, 0.3);
 }
 
 .action-btn:disabled {
@@ -1074,9 +1084,9 @@ onBeforeUnmount(() => {
   gap: 8px;
   margin-top: 12px;
   padding: 8px 12px;
-  background: #fff3f3;
-  border-radius: 8px;
-  color: #ff4444;
+  background: #FFF0F5;
+  border-radius: 10px;
+  color: #FF6B9D;
   font-size: 13px;
 }
 
@@ -1084,7 +1094,7 @@ onBeforeUnmount(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #ff4444;
+  background: #FF6B9D;
   animation: blink 1s infinite;
 }
 
@@ -1115,7 +1125,7 @@ onBeforeUnmount(() => {
   width: 100%;
   padding: 12px;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
@@ -1123,22 +1133,22 @@ onBeforeUnmount(() => {
 }
 
 .voice-call-btn.start-call {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
   color: white;
 }
 
 .voice-call-btn.start-call:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 12px rgba(255, 107, 157, 0.3);
 }
 
 .voice-call-btn.end-call {
-  background: #ff4444;
+  background: #FF6B9D;
   color: white;
 }
 
 .voice-call-btn.end-call:hover {
-  background: #cc0000;
+  background: #C44569;
 }
 
 .voice-call-btn:disabled {
@@ -1157,8 +1167,8 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   padding: 12px;
-  background: #e8f5e9;
-  border-radius: 8px;
+  background: #FFF0F5;
+  border-radius: 12px;
 }
 
 .call-icon {
@@ -1168,16 +1178,15 @@ onBeforeUnmount(() => {
 .call-text {
   flex: 1;
   font-weight: 600;
-  color: #2e7d32;
+  color: #C44569;
 }
 
 .call-time {
   font-family: monospace;
   font-size: 16px;
-  color: #2e7d32;
+  color: #C44569;
 }
 
-/* 滚动条样式 */
 .chat-body::-webkit-scrollbar {
   width: 6px;
 }
@@ -1187,23 +1196,22 @@ onBeforeUnmount(() => {
 }
 
 .chat-body::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(255, 107, 157, 0.2);
   border-radius: 3px;
 }
 
 .chat-body::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(255, 107, 157, 0.3);
 }
 
-/* 响应式设计 */
 @media (max-width: 768px) {
   .chat-window {
     left: 10px;
     right: 10px;
     bottom: 10px;
     width: auto;
-    max-width: none; /* 允许全宽 */
-    max-height: 70vh; /* 限制最大高度为视口的70% */
+    max-width: none;
+    max-height: 70vh;
   }
   
   .chat-window.minimized {
@@ -1230,7 +1238,7 @@ onBeforeUnmount(() => {
   
   .chat-body {
     min-height: 200px;
-    max-height: calc(70vh - 200px); /* 减去头部和输入区域的高度 */
+    max-height: calc(70vh - 200px);
     padding: 12px;
   }
   
@@ -1315,7 +1323,6 @@ onBeforeUnmount(() => {
   }
 }
 
-/* 极小屏幕（小于375px）额外优化 */
 @media (max-width: 375px) {
   .chat-window {
     max-height: 65vh;

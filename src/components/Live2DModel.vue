@@ -1,5 +1,5 @@
 <template>
-  <div ref="canvasContainer" class="live2d-container"></div>
+  <div ref="canvasContainer" class="live2d-container" :class="{ 'hide-background': hideBackground }"></div>
 </template>
 
 <script setup lang="ts">
@@ -10,6 +10,7 @@ import { extensions } from '@pixi/extensions'
 import type { Live2DModel as Live2DModelType } from 'pixi-live2d-display/cubism4'
 import type { Live2DAnimationCommand, Live2DAnimationInfo, Live2DEmotion } from '../types/live2d'
 import { resolveAnimation } from '../config/emotionMap'
+import { getModelDisplayConfig } from '../config/display'
 
 
 const props = defineProps<{
@@ -20,6 +21,7 @@ const props = defineProps<{
   x?: number
   y?: number
   scale?: number
+  hideBackground?: boolean
 }>()
 
 const canvasContainer = ref<HTMLDivElement>()
@@ -30,6 +32,245 @@ let lastMouseX = 0
 let lastMouseY = 0
 let tickerRegistered = false
 let resizeObserver: ResizeObserver | null = null
+let backgroundDrawableIndices: number[] = []
+const backgroundMeshes: any[] = []
+
+// 收集 PIXI 场景图中所有 Mesh 对象（平铺遍历，不预先绑定 drawable 索引）
+const allSceneMeshes: any[] = []
+
+const collectAllSceneMeshes = () => {
+  allSceneMeshes.length = 0
+  if (!model) return
+
+  const walk = (node: any, depth: number, path: string) => {
+    if (!node) return
+    if (node.children && Array.isArray(node.children)) {
+      node.children.forEach((child: any, i: number) => {
+        const childPath = `${path}/${i}`
+        // PIXI Mesh 的判断：有 geometry 属性
+        if (child.geometry && child.visible !== undefined) {
+          allSceneMeshes.push({ mesh: child, depth, path: childPath, childIndex: i })
+        }
+        // 无论是否为 Mesh，都继续递归（Container 也可能包含子节点）
+        walk(child, depth + 1, childPath)
+      })
+    }
+  }
+  walk(model, 0, 'root')
+  console.log(`🔍 场景图中共找到 ${allSceneMeshes.length} 个 Mesh`)
+}
+
+const identifyBackgroundDrawables = () => {
+  backgroundDrawableIndices = []
+  backgroundMeshes.length = 0
+  if (!model?.internalModel) return
+
+  // 首先收集场景图中所有 Mesh
+  collectAllSceneMeshes()
+
+  const coreModel = (model.internalModel as any).coreModel
+  const drawables = coreModel?._model?.drawables
+  if (!drawables?.renderOrders) {
+    // 没有 drawable 数据时，用场景图中深度最大的 mesh 作为背景候选
+    if (allSceneMeshes.length > 0) {
+      const sorted = [...allSceneMeshes].sort((a, b) => b.depth - a.depth)
+      const candidates = sorted.slice(0, Math.max(1, Math.ceil(sorted.length * 0.3)))
+      candidates.forEach(item => backgroundMeshes.push(item.mesh))
+      console.log('⚠️ 回退: 场景图深度推断背景, 候选数:', backgroundMeshes.length)
+    }
+    return
+  }
+
+  const renderOrders: number[] = Array.from(drawables.renderOrders as Float32Array)
+  console.log('📊 Drawables 总数:', renderOrders.length, '场景Mesh数:', allSceneMeshes.length)
+
+  // 获取纹理 URL 用于检测
+  const textureUrls: string[] = []
+  try {
+    const settings = (model.internalModel as any).settings
+    if (settings?.textures) {
+      settings.textures.forEach((t: any) => textureUrls.push(String(t || '')))
+    }
+  } catch { /* ignore */ }
+  console.log('🖼️ 纹理 URL:', textureUrls)
+
+  // 策略1: 纹理名匹配关键词
+  const bgTextureSet = new Set<number>()
+  textureUrls.forEach((url, idx) => {
+    const lower = url.toLowerCase()
+    if (/background|_bg_|_bg\.|bg_|back_|haikei|scene|stage/i.test(lower)) {
+      bgTextureSet.add(idx)
+    }
+  })
+
+  if (bgTextureSet.size > 0) {
+    const textures = drawables.textureIndexes as Int16Array | undefined
+    if (textures) {
+      Array.from(textures).forEach((texIdx, drawIdx) => {
+        if (bgTextureSet.has(texIdx)) backgroundDrawableIndices.push(drawIdx)
+      })
+    }
+    console.log('✅ 背景检测(纹理名) - 索引:', backgroundDrawableIndices)
+  }
+
+  // 策略2: 基于场景图 — 大面积 mesh 通常是背景
+  if (backgroundDrawableIndices.length === 0 && allSceneMeshes.length > 0) {
+    const canvasW = app?.screen.width ?? 0
+    const canvasH = app?.screen.height ?? 0
+    const totalArea = canvasW * canvasH
+
+    const meshInfos: Array<{ idx: number; areaRatio: number; depth: number; path: string }> = []
+    allSceneMeshes.forEach((item, idx) => {
+      const m = item.mesh
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+      try {
+        const posBuf = m.geometry?.getBuffer('aVertexPosition')
+        if (posBuf?.data) {
+          const arr = posBuf.data as Float32Array
+          for (let i = 0; i < arr.length; i += 2) {
+            const vx = arr[i] as number
+            const vy = arr[i + 1] as number
+            if (vx !== undefined && vy !== undefined) {
+              if (vx < minX) minX = vx
+              if (vx > maxX) maxX = vx
+              if (vy < minY) minY = vy
+              if (vy > maxY) maxY = vy
+            }
+          }
+        }
+      } catch { /* skip malformed geometry */ }
+      const w = maxX - minX
+      const h = maxY - minY
+      const area = w * h
+      const areaRatio = totalArea > 0 ? area / totalArea : 0
+      if (area > 0) {
+        meshInfos.push({ idx, areaRatio, depth: item.depth, path: item.path })
+      }
+    })
+
+    console.log('📐 Mesh 包围盒分析 (前10):',
+      meshInfos.slice(0, 10).map(i => ({
+        idx: i.idx, areaRatio: (i.areaRatio * 100).toFixed(1) + '%',
+        depth: i.depth, path: i.path
+      }))
+    )
+
+    // 背景 mesh 覆盖面积大（>40%画布）
+    meshInfos.forEach(info => {
+      if (info.areaRatio > 0.4) {
+        backgroundMeshes.push(allSceneMeshes[info.idx].mesh)
+      }
+    })
+
+    if (backgroundMeshes.length > 0) {
+      console.log('✅ 背景检测(大面积Mesh) - 数量:', backgroundMeshes.length)
+    }
+  }
+
+  // 策略3: renderOrder 最低的 drawable
+  if (backgroundDrawableIndices.length === 0 && backgroundMeshes.length === 0) {
+    const minOrder = Math.min(...renderOrders)
+    renderOrders.forEach((order, index) => {
+      if (order === minOrder) backgroundDrawableIndices.push(index)
+    })
+    console.log('✅ 背景检测(renderOrder) - 索引:', backgroundDrawableIndices, '最小 order:', minOrder)
+  }
+
+  // 策略4: renderOrder 最低的 20%
+  if (backgroundDrawableIndices.length === 0 && backgroundMeshes.length === 0) {
+    const sorted = renderOrders.map((order, idx) => ({ order, idx })).sort((a, b) => a.order - b.order)
+    const cutoff = Math.max(1, Math.floor(renderOrders.length * 0.2))
+    sorted.slice(0, cutoff).forEach(({ idx }) => backgroundDrawableIndices.push(idx))
+    console.log('⚠️ 背景检测(top 20%) - 索引:', backgroundDrawableIndices)
+  }
+
+  // 如果在场景图中找到了 backgroundMeshes，直接使用
+  if (backgroundMeshes.length > 0) {
+    console.log('🎯 背景检测(large area meshes) - mesh数量:', backgroundMeshes.length)
+    return
+  }
+
+  // 尝试通过 drawable 索引匹配 PIXI Mesh（多种途径）
+  const _meshes = (model as any)._meshes
+  if (_meshes && Array.isArray(_meshes)) {
+    backgroundDrawableIndices.forEach(idx => {
+      if (_meshes[idx]) backgroundMeshes.push(_meshes[idx])
+    })
+  }
+
+  if (backgroundMeshes.length === 0) {
+    const meshes = (model as any).meshes
+    if (meshes && Array.isArray(meshes)) {
+      meshes.forEach((row: any) => {
+        if (Array.isArray(row)) {
+          row.forEach((mesh: any, idx: number) => {
+            if (backgroundDrawableIndices.includes(idx) && mesh) {
+              backgroundMeshes.push(mesh)
+            }
+          })
+        }
+      })
+    }
+  }
+
+  // 用场景图 mesh 按索引匹配
+  if (backgroundMeshes.length === 0 && allSceneMeshes.length > 0) {
+    backgroundDrawableIndices.forEach(idx => {
+      if (idx < allSceneMeshes.length) {
+        backgroundMeshes.push(allSceneMeshes[idx].mesh)
+      }
+    })
+  }
+
+  console.log('🎯 背景检测最终结果 - drawable索引:', backgroundDrawableIndices, 'mesh数量:', backgroundMeshes.length)
+}
+
+const applyHideBackground = (hide: boolean) => {
+  console.log('applyHideBackground:', hide, 'meshes:', backgroundMeshes.length, 'indices:', backgroundDrawableIndices)
+
+  // 方法1: 直接隐藏已找到的 PIXI Mesh
+  if (backgroundMeshes.length > 0) {
+    backgroundMeshes.forEach(mesh => {
+      if (mesh) {
+        mesh.visible = !hide
+        mesh.renderable = !hide
+        mesh.alpha = hide ? 0 : 1
+      }
+    })
+    console.log('  ✅ 通过 mesh.visible/alpha 隐藏了', backgroundMeshes.length, '个 mesh')
+    return
+  }
+
+  // 方法2: 如果没找到特定 mesh，尝试隐藏场景图中前几个 mesh（可能是背景层）
+  if (allSceneMeshes.length > 0) {
+    // 隐藏深度最大的几个 mesh（它们最先被渲染，可能是背景）
+    const sorted = [...allSceneMeshes].sort((a, b) => b.depth - a.depth)
+    const candidates = sorted.slice(0, Math.ceil(sorted.length * 0.3))
+    candidates.forEach(({ mesh }) => {
+      if (mesh) {
+        mesh.visible = !hide
+        mesh.renderable = !hide
+        mesh.alpha = hide ? 0 : 1
+      }
+    })
+    console.log('  ✅ 通过场景图深度隐藏了', candidates.length, '个 mesh (共', allSceneMeshes.length, '个)')
+    return
+  }
+
+  // 方法3: 设置 drawables opacities
+  if (model?.internalModel && backgroundDrawableIndices.length > 0) {
+    const coreModel = (model.internalModel as any).coreModel
+    const drawables = coreModel?._model?.drawables
+    if (drawables?.opacities) {
+      backgroundDrawableIndices.forEach(index => {
+        drawables.opacities[index] = hide ? 0 : 1
+      })
+      console.log('  ✅ 通过 drawables.opacities 隐藏')
+      return
+    }
+  }
+  console.log('  ⚠️ 没有找到可用的隐藏方法')
+}
 
 const blinkState = {
   phase: 'idle' as 'idle' | 'closing' | 'opening',
@@ -49,13 +290,20 @@ const initPixiApp = () => {
   app = new Application({
     width: width,
     height: height,
+    backgroundColor: 0x00000000,
     backgroundAlpha: 0,
     preserveDrawingBuffer: false,
     autoDensity: true,
     resolution: window.devicePixelRatio || 1,
+    transparent: true,
   })
 
-  canvasContainer.value.appendChild(app.view as HTMLCanvasElement)
+  // 强制设置 canvas 透明
+  const canvas = app.view as HTMLCanvasElement
+  canvas.style.background = 'transparent'
+  canvas.style.backgroundColor = 'transparent'
+
+  canvasContainer.value.appendChild(canvas)
 }
 
 const loadModel = async () => {
@@ -79,16 +327,45 @@ const loadModel = async () => {
       model.y = props.y
       model.scale.set(props.scale)
     } else {
+      const displayCfg = getModelDisplayConfig(props.modelId)
       const containerWidth = app.screen.width
       const containerHeight = app.screen.height
       const modelWidth = model.width
       const modelHeight = model.height
-      const scaleX = (containerWidth * 0.8) / modelWidth
-      const scaleY = (containerHeight * 0.8) / modelHeight
-      const optimalScale = Math.min(scaleX, scaleY)
+      const fillRatio = displayCfg.fillRatio ?? 0.8
+
+      let optimalScale: number
+      if (displayCfg.defaultScale && displayCfg.defaultScale > 0) {
+        optimalScale = displayCfg.defaultScale
+        console.log('使用配置的默认缩放:', displayCfg.defaultScale)
+      } else if (modelWidth > 0 && modelHeight > 0) {
+        const scaleX = (containerWidth * fillRatio) / modelWidth
+        const scaleY = (containerHeight * fillRatio) / modelHeight
+        optimalScale = Math.min(scaleX, scaleY)
+
+        const MIN_SCALE = 0.01
+        const MAX_SCALE = 10
+        if (optimalScale < MIN_SCALE) {
+          console.warn(`计算的缩放过小 (${optimalScale.toFixed(6)})，使用最小值 ${MIN_SCALE}。模型尺寸: ${modelWidth}x${modelHeight}, 容器: ${containerWidth}x${containerHeight}`)
+          optimalScale = MIN_SCALE
+        } else if (optimalScale > MAX_SCALE) {
+          console.warn(`计算的缩放过大 (${optimalScale.toFixed(6)})，使用最大值 ${MAX_SCALE}`)
+          optimalScale = MAX_SCALE
+        }
+      } else {
+        optimalScale = 1
+      }
+
       model.scale.set(optimalScale)
-      model.x = containerWidth / 2
-      model.y = containerHeight / 2
+      model.anchor.set(displayCfg.anchorX ?? 0.5, displayCfg.anchorY ?? 0.5)
+      model.x = displayCfg.positionX === 'center' ? containerWidth / 2
+        : displayCfg.positionX === 'left' ? 0
+        : displayCfg.positionX === 'right' ? containerWidth
+        : typeof displayCfg.positionX === 'number' ? displayCfg.positionX : containerWidth / 2
+      model.y = displayCfg.positionY === 'center' ? containerHeight / 2
+        : displayCfg.positionY === 'top' ? 0
+        : displayCfg.positionY === 'bottom' ? containerHeight
+        : typeof displayCfg.positionY === 'number' ? displayCfg.positionY : containerHeight / 2
     }
 
     if (model.internalModel.motionManager) {
@@ -96,6 +373,8 @@ const loadModel = async () => {
     }
 
     adjustModelToContainer()
+
+    identifyBackgroundDrawables()
 
     console.log('Live2D 模型加载成功', {
       modelSize: { width: model.width, height: model.height },
@@ -158,16 +437,41 @@ const handleMouseMove = (event: MouseEvent) => {
 
 const adjustModelToContainer = () => {
   if (!app || !model) return
+  const displayCfg = getModelDisplayConfig(props.modelId)
   const containerWidth = app.screen.width
   const containerHeight = app.screen.height
   const baseModelWidth = model.width / model.scale.x
   const baseModelHeight = model.height / model.scale.y
-  const scaleX = (containerWidth * 0.8) / baseModelWidth
-  const scaleY = (containerHeight * 0.8) / baseModelHeight
-  const optimalScale = Math.min(scaleX, scaleY)
+  const fillRatio = displayCfg.fillRatio ?? 0.8
+
+  let optimalScale: number
+  if (displayCfg.defaultScale && displayCfg.defaultScale > 0) {
+    optimalScale = displayCfg.defaultScale
+  } else if (baseModelWidth > 0 && baseModelHeight > 0) {
+    const scaleX = (containerWidth * fillRatio) / baseModelWidth
+    const scaleY = (containerHeight * fillRatio) / baseModelHeight
+    optimalScale = Math.min(scaleX, scaleY)
+
+    const MIN_SCALE = 0.01
+    const MAX_SCALE = 10
+    if (optimalScale < MIN_SCALE) {
+      optimalScale = MIN_SCALE
+    } else if (optimalScale > MAX_SCALE) {
+      optimalScale = MAX_SCALE
+    }
+  } else {
+    optimalScale = 1
+  }
+
   model.scale.set(optimalScale)
-  model.x = containerWidth / 2
-  model.y = containerHeight / 2
+  model.x = displayCfg.positionX === 'center' ? containerWidth / 2
+    : displayCfg.positionX === 'left' ? 0
+    : displayCfg.positionX === 'right' ? containerWidth
+    : typeof displayCfg.positionX === 'number' ? displayCfg.positionX : containerWidth / 2
+  model.y = displayCfg.positionY === 'center' ? containerHeight / 2
+    : displayCfg.positionY === 'top' ? 0
+    : displayCfg.positionY === 'bottom' ? containerHeight
+    : typeof displayCfg.positionY === 'number' ? displayCfg.positionY : containerHeight / 2
 }
 
 const onResize = () => {
@@ -182,9 +486,43 @@ const onResize = () => {
 const startRenderLoop = () => {
   if (!app) return
   app.ticker.add(() => {
-    if (app) updateBlink(app.ticker.deltaMS)
+    if (app) {
+      updateBlink(app.ticker.deltaMS)
+
+      // 每帧确保背景 mesh/opacity 保持目标状态
+      if (!props.hideBackground) return
+
+      // 保持 PIXI mesh 隐藏
+      if (backgroundMeshes.length > 0) {
+        backgroundMeshes.forEach(mesh => {
+          if (mesh && mesh.visible !== false) {
+            mesh.visible = false
+            mesh.renderable = false
+            mesh.alpha = 0
+          }
+        })
+      }
+
+      // 兜底: 保持 drawable opacities
+      if (model?.internalModel && backgroundDrawableIndices.length > 0) {
+        const coreModel = (model.internalModel as any).coreModel
+        const drawables = coreModel?._model?.drawables
+        if (drawables?.opacities) {
+          backgroundDrawableIndices.forEach(index => {
+            if (drawables.opacities[index] !== 0) {
+              drawables.opacities[index] = 0
+            }
+          })
+        }
+      }
+    }
   })
 }
+
+watch(() => props.hideBackground, (val) => {
+  console.log('hideBackground changed to:', val, 'backgroundDrawableIndices:', backgroundDrawableIndices)
+  applyHideBackground(val)
+})
 
 const playMotion = (group: string, index = 0) => {
   if (!model) {
@@ -298,6 +636,8 @@ defineExpose({
 
 onMounted(async () => {
   initPixiApp()
+
+  await waitForContainerReady()
   await loadModel()
   startRenderLoop()
 
@@ -316,6 +656,36 @@ onMounted(async () => {
     resizeObserver.observe(canvasContainer.value)
   }
 })
+
+const waitForContainerReady = (): Promise<void> => {
+  return new Promise((resolve) => {
+    const checkReady = () => {
+      if (!canvasContainer.value) {
+        resolve()
+        return
+      }
+
+      const rect = canvasContainer.value.getBoundingClientRect()
+      const width = Math.max(1, Math.floor(rect.width))
+      const height = Math.max(1, Math.floor(rect.height))
+
+      if (width > 10 && height > 10) {
+        console.log(`✅ 容器就绪: ${width}x${height}`)
+        resolve()
+        return
+      }
+
+      console.log(`⏳ 等待容器就绪... 当前: ${width}x${height}`)
+      requestAnimationFrame(checkReady)
+    }
+
+    setTimeout(() => {
+      resolve()
+    }, 5000)
+
+    requestAnimationFrame(checkReady)
+  })
+}
 
 onUnmounted(() => {
   window.removeEventListener('mousemove', handleMouseMove)
@@ -341,6 +711,8 @@ onUnmounted(() => {
 
 watch(() => props.modelPath, async () => {
   if (model && app) {
+    backgroundDrawableIndices = []
+    backgroundMeshes.length = 0
     app.stage.removeChild(model)
     model.destroy()
     await loadModel()
@@ -353,10 +725,20 @@ watch(() => props.modelPath, async () => {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  background: transparent;
 }
 
 .live2d-container canvas {
   width: 100% !important;
   height: 100% !important;
+  background: transparent;
+}
+
+.live2d-container.hide-background {
+  background: transparent !important;
+}
+
+.live2d-container.hide-background canvas {
+  background: transparent !important;
 }
 </style>
