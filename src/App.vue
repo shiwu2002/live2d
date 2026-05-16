@@ -44,11 +44,12 @@
     />
 
     <div v-if="discoveredModels.length > 0" class="pet-container desktop-pet">
-      <div class="background-board" :class="{ 'hidden': !showBackground }"></div>
-      <div class="pet-model-area desktop-pet">
-        <div class="drag-handle" @mousedown="handleDragStart" title="拖拽移动窗口">
+      <div class="background-board" :class="{ 'hidden': !showBackground }">
+        <div class="drag-handle-top-right" @mousedown="handleDragStart" title="拖拽移动窗口">
           <img src="./images/移动.png" class="drag-icon" alt="拖拽" />
         </div>
+      </div>
+      <div class="pet-model-area desktop-pet">
         <Live2DModel
           v-if="modelPath"
           ref="live2dModelRef"
@@ -789,6 +790,7 @@ const handleClickOutside = (e: MouseEvent) => {
 .app-container.desktop-pet {
   min-height: 100vh;
   background: transparent !important;
+  overflow: visible;
 }
 
 .loading-tip {
@@ -835,22 +837,104 @@ const handleClickOutside = (e: MouseEvent) => {
 
 .background-board {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100vw;
-  height: 100vh;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  width: calc(100vw - 20px);
+  height: calc(100vh - 20px);
   background: linear-gradient(135deg, #FFB6C1 0%, #FFC0CB 50%, #FFCCD5 100%);
-  border-radius: 0;
-  z-index: -1;
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  border-radius: 20px;
+  z-index: 0;
+  transition: all 0.3s ease;
+  box-shadow:
+    0 8px 32px rgba(255, 107, 157, 0.2),
+    0 16px 48px rgba(255, 107, 157, 0.12);
+  overflow: hidden;
+}
+
+.background-board::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  padding: 6px;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.4) 0%,
+      transparent 50%
+    );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.background-board::after {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  box-shadow:
+    inset 0 2px 8px rgba(255, 182, 193, 0.15),
+    inset 0 -2px 8px rgba(255, 240, 245, 0.25);
+  pointer-events: none;
 }
 
 .background-board.hidden {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+}
+
+.drag-handle-top-right {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  cursor: grab;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(8px);
+  transition: all 0.3s ease;
+  -webkit-app-region: drag;
+  -webkit-user-select: none;
+  user-select: none;
+  border: 1.5px solid rgba(255, 107, 157, 0.2);
+}
+
+.drag-handle-top-right:hover {
+  background: rgba(255, 255, 255, 0.5);
+  transform: scale(1.1);
+  box-shadow: 0 4px 16px rgba(255, 107, 157, 0.2);
+}
+
+.drag-handle-top-right:active {
+  cursor: grabbing;
+  transform: scale(0.95);
+}
+
+.drag-handle-top-right .drag-icon {
+  width: 24px;
+  height: 24px;
+  display: block;
+  opacity: 0.8;
+  filter: brightness(0) saturate(100%) invert(60%) sepia(30%) saturate(500%) hue-rotate(320deg) brightness(90%);
+  transition: all 0.3s ease;
+}
+
+.drag-handle-top-right:hover .drag-icon {
+  opacity: 1;
+  filter: brightness(0) saturate(100%) invert(50%) sepia(40%) saturate(600%) hue-rotate(330deg) brightness(95%);
 }
 
 .pet-container.desktop-pet:hover {
@@ -882,58 +966,6 @@ const handleClickOutside = (e: MouseEvent) => {
   cursor: grabbing;
 }
 
-.drag-handle {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 80px;
-  height: 80px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-  cursor: grab;
-  border-radius: 50%;
-  background: transparent;
-  -webkit-app-region: drag;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-.drag-handle::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(8px);
-  opacity: 0;
-  transform: scale(0.5);
-  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.drag-handle:hover::before {
-  opacity: 1;
-  transform: scale(1);
-}
-
-.drag-icon {
-  width: 36px;
-  height: 36px;
-  display: block;
-  opacity: 0;
-  transform: scale(0.5);
-  transition: opacity 0.25s ease 0.05s, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) 0.05s;
-  position: relative;
-  z-index: 1;
-}
-
-.drag-handle:hover .drag-icon {
-  opacity: 1;
-  transform: scale(1);
-}
-
 .pet-toolbar {
   padding: 12px 14px;
   background: rgba(255, 255, 255, 0.96);
@@ -942,7 +974,7 @@ const handleClickOutside = (e: MouseEvent) => {
 
 .pet-toolbar.desktop-pet {
   position: fixed;
-  bottom: 16px;
+  bottom: 26px;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(255, 255, 255, 0.6);
