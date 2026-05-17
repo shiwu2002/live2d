@@ -103,7 +103,7 @@ export class WebSocketService {
    * 获取完整的 WebSocket URL
    */
   private getWebSocketUrl(): string {
-    const { baseUrl, openid, aiSessionId, mode } = this.config
+    const { baseUrl, aiSessionId, mode } = this.config
     
     // 根据模式选择端点
     const endpoint = mode === 'voice' ? '/ws/voice' : '/ws/chat'
@@ -116,9 +116,6 @@ export class WebSocketService {
     const token = authService.getToken()
     if (token) {
       params.append('token', token)
-    }
-    if (openid) {
-      params.append('openid', openid)
     }
     if (aiSessionId) {
       params.append('aiSessionId', aiSessionId)
@@ -244,6 +241,11 @@ export class WebSocketService {
             timestamp: parsed.timestamp || Date.now(),
             id: parsed.id || this.generateId(),
             animation: parsed.animation || undefined,
+          }
+          
+          // 过滤掉后端回传的用户消息（sendText 已做本地回显，避免重复显示）
+          if (message.type === 'TEXT' && message.sender === 'user') {
+            return
           }
           
           this.notifyMessage(message)

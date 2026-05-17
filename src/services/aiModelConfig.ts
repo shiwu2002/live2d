@@ -462,10 +462,10 @@ export class AiModelConfigService {
   /**
    * 获取用户可用模型（含自定义模型）
    */
-  async getDisplayModelsWithCustom(userId: string): Promise<CustomModelDisplayInfo[]> {
+  async getDisplayModelsWithCustom(): Promise<CustomModelDisplayInfo[]> {
     try {
       const response = await this.fetchWithAuth(
-        `${this.baseUrl}/api/ai-model-config/display-with-custom?userId=${encodeURIComponent(userId)}`
+        `${this.baseUrl}/api/ai-model-config/display-with-custom`
       )
       const result: ApiResponse<CustomModelDisplayInfo[]> = await response.json()
 
@@ -484,10 +484,10 @@ export class AiModelConfigService {
   /**
    * 获取用户自定义模型列表
    */
-  async getUserCustomModels(userId: string): Promise<Map<string, any>[]> {
+  async getUserCustomModels(): Promise<Map<string, any>[]> {
     try {
       const response = await this.fetchWithAuth(
-        `${this.baseUrl}/api/custom-model/list?userId=${encodeURIComponent(userId)}`
+        `${this.baseUrl}/api/custom-model/list`
       )
       const result: ApiResponse<Map<string, any>[]> = await response.json()
 
@@ -529,10 +529,10 @@ export class AiModelConfigService {
   /**
    * 更新用户自定义模型
    */
-  async updateCustomModel(id: number, userId: string, model: UserCustomModel): Promise<any | null> {
+  async updateCustomModel(id: number, model: UserCustomModel): Promise<any | null> {
     try {
       const response = await this.fetchWithAuth(
-        `${this.baseUrl}/api/custom-model/update/${id}?userId=${encodeURIComponent(userId)}`,
+        `${this.baseUrl}/api/custom-model/update/${id}`,
         {
           method: 'PUT',
           body: JSON.stringify(model)
@@ -555,10 +555,10 @@ export class AiModelConfigService {
   /**
    * 删除用户自定义模型
    */
-  async deleteCustomModel(id: number, userId: string): Promise<boolean> {
+  async deleteCustomModel(id: number): Promise<boolean> {
     try {
       const response = await this.fetchWithAuth(
-        `${this.baseUrl}/api/custom-model/delete/${id}?userId=${encodeURIComponent(userId)}`,
+        `${this.baseUrl}/api/custom-model/delete/${id}`,
         { method: 'DELETE' }
       )
       const result: ApiResponse<any> = await response.json()
@@ -578,10 +578,10 @@ export class AiModelConfigService {
   /**
    * 设置默认自定义模型
    */
-  async setDefaultCustomModel(id: number, userId: string): Promise<boolean> {
+  async setDefaultCustomModel(id: number): Promise<boolean> {
     try {
       const response = await this.fetchWithAuth(
-        `${this.baseUrl}/api/custom-model/set-default/${id}?userId=${encodeURIComponent(userId)}`,
+        `${this.baseUrl}/api/custom-model/set-default/${id}`,
         { method: 'POST' }
       )
       const result: ApiResponse<any> = await response.json()
@@ -828,11 +828,11 @@ export class AiModelSwitchService {
   /**
    * 用户设置自己的模型偏好（新 API）
    */
-  async setUserPreference(userId: string, model: string): Promise<SetPreferenceResponse> {
+  async setUserPreference(model: string): Promise<SetPreferenceResponse> {
     try {
       const encodedModel = encodeURIComponent(model)
       const response = await this.fetchWithAuth(
-        `${this.baseUrl}/api/ai/user/preference?userId=${encodeURIComponent(userId)}&model=${encodedModel}`,
+        `${this.baseUrl}/api/ai/user/preference?model=${encodedModel}`,
         { method: 'POST' }
       )
       const result: ApiResponse<SetPreferenceResponse> = await response.json()
@@ -852,9 +852,9 @@ export class AiModelSwitchService {
   /**
    * 获取用户当前的模型偏好（新 API）
    */
-  async getUserPreference(userId: string): Promise<UserPreference | null> {
+  async getUserPreference(): Promise<UserPreference | null> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai/user/preference?userId=${encodeURIComponent(userId)}`)
+      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai/user/preference`)
       const result: ApiResponse<UserPreference> = await response.json()
 
       if (result.code === 200) {
@@ -872,9 +872,9 @@ export class AiModelSwitchService {
   /**
    * 清除用户的模型偏好（恢复默认）（新 API）
    */
-  async clearUserPreference(userId: string): Promise<SetPreferenceResponse> {
+  async clearUserPreference(): Promise<SetPreferenceResponse> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai/user/preference?userId=${encodeURIComponent(userId)}`, {
+      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai/user/preference`, {
         method: 'DELETE'
       })
       const result: ApiResponse<SetPreferenceResponse> = await response.json()
@@ -894,9 +894,9 @@ export class AiModelSwitchService {
   /**
    * 获取用户的 ChatClient（根据用户偏好自动选择）（新 API）
    */
-  async getUserClient(userId: string): Promise<UserClientInfo | null> {
+  async getUserClient(): Promise<UserClientInfo | null> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai/user/client?userId=${encodeURIComponent(userId)}`)
+      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai/user/client`)
       const result: ApiResponse<UserClientInfo> = await response.json()
 
       if (result.code === 200) {

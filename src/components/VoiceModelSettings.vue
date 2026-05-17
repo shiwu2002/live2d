@@ -269,8 +269,8 @@ const loadModels = async () => {
   testResult.value = null
   try {
     const [ttsList, asrList] = await Promise.all([
-      voiceModelService.getListByType(props.userId, 'tts'),
-      voiceModelService.getListByType(props.userId, 'asr')
+      voiceModelService.getListByType('tts'),
+      voiceModelService.getListByType('asr')
     ])
     ttsModels.value = ttsList || []
     asrModels.value = asrList || []
@@ -317,7 +317,7 @@ const handleSubmit = async () => {
       delete payload.apiKey
     }
     if (editingId.value) {
-      await voiceModelService.update(editingId.value, props.userId, payload)
+      await voiceModelService.update(editingId.value, payload)
     } else {
       await voiceModelService.create(payload)
     }
@@ -332,7 +332,7 @@ const handleSubmit = async () => {
 
 const handleDelete = async (model: VoiceModel) => {
   if (!model.id) return
-  await voiceModelService.delete(model.id, props.userId)
+  await voiceModelService.delete(model.id)
   testResult.value = null
   await loadModels()
   emit('changed')
@@ -340,7 +340,7 @@ const handleDelete = async (model: VoiceModel) => {
 
 const handleSetDefault = async (model: VoiceModel) => {
   if (!model.id) return
-  await voiceModelService.setDefault(model.id, props.userId)
+  await voiceModelService.setDefault(model.id)
   await loadModels()
   emit('changed')
 }
@@ -352,14 +352,14 @@ const handleTest = async (model: VoiceModel) => {
   try {
     let result
     if (model.modelType === 'tts') {
-      result = await voiceModelService.testTts(model.id!, props.userId)
+      result = await voiceModelService.testTts(model.id!)
       if (result?.success) {
         testResult.value = { success: true, message: `TTS 测试成功！耗时 ${result.executionTime || '-'}，音频大小正常` }
       } else {
         testResult.value = { success: false, message: 'TTS 测试失败，请检查配置是否正确' }
       }
     } else {
-      result = await voiceModelService.testAsr(model.id!, props.userId)
+      result = await voiceModelService.testAsr(model.id!)
       if (result?.success) {
         testResult.value = { success: true, message: 'ASR 模型配置验证通过，请通过语音对话进行实际测试' }
       } else {

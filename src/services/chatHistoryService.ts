@@ -27,13 +27,13 @@ class ChatHistoryService {
     return headers
   }
 
-  async fetchHistory(userId: string, lastId?: number, pageSize = 20): Promise<HistoryPage> {
+  async fetchHistory(lastId?: number, pageSize = 20): Promise<HistoryPage> {
     const params = new URLSearchParams()
     if (lastId !== undefined && lastId > 0) params.append('lastId', String(lastId))
     params.append('pageSize', String(pageSize))
 
     const res = await fetch(
-      `${this.getBaseUrl()}/api/session/user/${encodeURIComponent(userId)}/history/keyset?${params}`,
+      `${this.getBaseUrl()}/api/session/user/history/keyset?${params}`,
       { headers: this.getAuthHeaders() }
     )
     const json = await res.json()

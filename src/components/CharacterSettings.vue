@@ -198,7 +198,7 @@ const showMessage = (text: string, type: 'success' | 'error') => {
 const loadCharacter = async () => {
   if (!props.userId) return
   try {
-    const res = await characterService.getByUserId(props.userId)
+    const res = await characterService.get()
     if (res.code === 200 && res.data) {
       const c = res.data
       form.value = {
@@ -226,7 +226,7 @@ const loadVoices = async () => {
   if (!props.userId) return
   loadingVoices.value = true
   try {
-    const res = await characterService.listVoices(props.userId)
+    const res = await characterService.listVoices()
     if (res.code === 200 && res.data) {
       voices.value = res.data
     }
@@ -325,7 +325,7 @@ const handleSave = async () => {
     const res = await characterService.saveOrUpdate(form.value)
     if (res.code === 200) {
       showMessage('保存成功', 'success')
-      const fullRes = await characterService.getByUserId(props.userId)
+      const fullRes = await characterService.get()
       if (fullRes.code === 200 && fullRes.data) {
         emit('saved', fullRes.data)
       }
@@ -343,7 +343,7 @@ const handleCloneVoice = async () => {
   if (!props.userId || !uploadedAudioUrl.value) return
   cloningVoice.value = true
   try {
-    const res = await characterService.updateVoice(props.userId, uploadedAudioUrl.value)
+    const res = await characterService.updateVoice(uploadedAudioUrl.value)
     if (res.code === 200 && res.data) {
       currentVoiceId.value = res.data
       showMessage(`音色克隆成功: ${res.data}`, 'success')
@@ -362,7 +362,7 @@ const handleCloneVoice = async () => {
 const handleUseVoice = async (voiceId: string) => {
   if (!props.userId) return
   try {
-    const charRes = await characterService.getByUserId(props.userId)
+    const charRes = await characterService.get()
     if (charRes.code === 200 && charRes.data) {
       const updateData: CharacterInfoDto = {
         userId: charRes.data.userId,
@@ -389,7 +389,7 @@ const handleUseVoice = async (voiceId: string) => {
 const handleDeleteVoice = async (voiceId: string) => {
   if (!props.userId) return
   try {
-    const res = await characterService.deleteVoice(props.userId, voiceId)
+    const res = await characterService.deleteVoice(voiceId)
     if (res.code === 200) {
       if (currentVoiceId.value === voiceId) {
         currentVoiceId.value = ''

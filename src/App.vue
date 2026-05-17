@@ -715,11 +715,11 @@ const loadAiModels = async () => {
   aiModelsLoading.value = true
   try {
     // 使用 display-with-custom API 获取模型列表（含用户自定义模型）
-    const models = await aiModelConfigService.getDisplayModelsWithCustom(currentUser.value.openid)
+    const models = await aiModelConfigService.getDisplayModelsWithCustom()
     aiModels.value = models
 
     // 尝试加载用户的偏好设置
-    const preference = await aiModelSwitchService.getUserPreference(currentUser.value.openid)
+    const preference = await aiModelSwitchService.getUserPreference()
     if (preference && preference.hasCustomPreference) {
       // 检查偏好的模型是否在可用列表中
       const preferredModel = models.find(m => m.fullIdentifier === preference.preferredModel)
@@ -783,7 +783,6 @@ const handleAiModelChange = async () => {
   try {
     console.log('设置用户模型偏好:', selectedAiModel.value)
     const result = await aiModelSwitchService.setUserPreference(
-      currentUser.value.openid,
       selectedAiModel.value
     )
     console.log('模型偏好设置成功:', result)

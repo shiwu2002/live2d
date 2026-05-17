@@ -44,12 +44,10 @@ class RagService {
 
   async uploadMemoryFile(
     file: File,
-    userId: string,
     aiSessionId?: string
   ): Promise<ApiResponse<UploadResult>> {
     const formData = new FormData()
     formData.append('file', file)
-    formData.append('userId', userId)
     if (aiSessionId) {
       formData.append('aiSessionId', aiSessionId)
     }
@@ -65,11 +63,9 @@ class RagService {
 
   async uploadMemoryJson(
     jsonContent: any,
-    userId: string,
     aiSessionId?: string
   ): Promise<ApiResponse<UploadResult>> {
     const params = new URLSearchParams()
-    params.append('userId', userId)
     if (aiSessionId) {
       params.append('aiSessionId', aiSessionId)
     }
@@ -89,12 +85,9 @@ class RagService {
     return response.json()
   }
 
-  async getMemoryList(userId: string): Promise<ApiResponse<MemoryDocument[]>> {
-    const params = new URLSearchParams()
-    params.append('userId', userId)
-
+  async getMemoryList(): Promise<ApiResponse<MemoryDocument[]>> {
     const response = await fetch(
-      `${this.getBaseUrl()}/rag/memory/list?${params.toString()}`,
+      `${this.getBaseUrl()}/rag/memory/list`,
       {
         method: 'GET',
         headers: this.getAuthHeaders(),
@@ -113,12 +106,9 @@ class RagService {
     return response.json()
   }
 
-  async deleteMemory(id: number, userId: string): Promise<ApiResponse<null>> {
-    const params = new URLSearchParams()
-    params.append('userId', userId)
-
+  async deleteMemory(id: number): Promise<ApiResponse<null>> {
     const response = await fetch(
-      `${this.getBaseUrl()}/rag/memory/${id}?${params.toString()}`,
+      `${this.getBaseUrl()}/rag/memory/${id}`,
       {
         method: 'DELETE',
         headers: this.getAuthHeaders(),

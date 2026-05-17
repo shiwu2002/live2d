@@ -162,7 +162,7 @@ const form = ref<UserCustomModel>(defaultForm())
 const loadModels = async () => {
   loading.value = true
   try {
-    const result = await aiModelConfigService.getUserCustomModels(props.userId)
+    const result = await aiModelConfigService.getUserCustomModels()
     customModels.value = (result || []).map((m: any) => ({
       id: m.id,
       userId: m.userId,
@@ -214,7 +214,7 @@ const handleSubmit = async () => {
       payload.apiKey = ''
     }
     if (editingId.value) {
-      await aiModelConfigService.updateCustomModel(editingId.value, props.userId, payload)
+      await aiModelConfigService.updateCustomModel(editingId.value, payload)
     } else {
       await aiModelConfigService.createCustomModel(payload)
     }
@@ -229,7 +229,7 @@ const handleSubmit = async () => {
 
 const handleDelete = async (model: UserCustomModel) => {
   if (!model.id) return
-  await aiModelConfigService.deleteCustomModel(model.id, props.userId)
+  await aiModelConfigService.deleteCustomModel(model.id)
   await loadModels()
   emit('changed')
 }

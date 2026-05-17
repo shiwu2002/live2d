@@ -369,7 +369,7 @@ const loadMemoryList = async () => {
 
   isLoading.value = true
   try {
-    const result = await ragService.getMemoryList(props.userId)
+    const result = await ragService.getMemoryList()
     if (result.code === 200 && result.data) {
       memoryList.value = result.data
     } else {
@@ -428,7 +428,6 @@ const handleUpload = async () => {
   try {
     const result = await ragService.uploadMemoryFile(
       selectedFile.value,
-      props.userId,
       props.aiSessionId
     )
 
@@ -456,7 +455,7 @@ const handleDelete = async (id: number) => {
 
   isDeleting.value = id
   try {
-    const result = await ragService.deleteMemory(id, props.userId)
+    const result = await ragService.deleteMemory(id)
     if (result.code === 200) {
       showMessage('删除成功', 'success')
       await loadMemoryList()

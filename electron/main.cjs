@@ -46,7 +46,7 @@ function stopPenetrationPolling() {
     penetrationPollInterval = null
   }
   lastPollIgnoreState = null
-  if (mainWindow) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
     mouseIgnoreActive = false
     mainWindow.setIgnoreMouseEvents(false)
   }

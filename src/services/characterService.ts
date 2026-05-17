@@ -32,8 +32,8 @@ class CharacterService {
     return res.json()
   }
 
-  async getByUserId(userId: string): Promise<ApiResponse<CharacterInfo>> {
-    const res = await fetch(`${this.getBaseUrl()}/${encodeURIComponent(userId)}`, {
+  async get(): Promise<ApiResponse<CharacterInfo>> {
+    const res = await fetch(this.getBaseUrl(), {
       headers: this.getHeaders(),
     })
     return res.json()
@@ -48,19 +48,18 @@ class CharacterService {
     return res.json()
   }
 
-  async delete(userId: string): Promise<ApiResponse<boolean>> {
-    const res = await fetch(`${this.getBaseUrl()}/${encodeURIComponent(userId)}`, {
+  async delete(): Promise<ApiResponse<boolean>> {
+    const res = await fetch(this.getBaseUrl(), {
       method: 'DELETE',
       headers: this.getHeaders(),
     })
     return res.json()
   }
 
-  async getPage(params: { pageNum?: number; pageSize?: number; userId?: string; name?: string }): Promise<ApiResponse<PageResult<CharacterInfo>>> {
+  async getPage(params: { pageNum?: number; pageSize?: number; name?: string }): Promise<ApiResponse<PageResult<CharacterInfo>>> {
     const query = new URLSearchParams()
     if (params.pageNum) query.set('pageNum', String(params.pageNum))
     if (params.pageSize) query.set('pageSize', String(params.pageSize))
-    if (params.userId) query.set('userId', params.userId)
     if (params.name) query.set('name', params.name)
     const res = await fetch(`${this.getBaseUrl()}/page?${query.toString()}`, {
       headers: this.getHeaders(),
@@ -68,9 +67,8 @@ class CharacterService {
     return res.json()
   }
 
-  async updateVoice(userId: string, audioFileUrl: string): Promise<ApiResponse<string>> {
+  async updateVoice(audioFileUrl: string): Promise<ApiResponse<string>> {
     const formData = new URLSearchParams()
-    formData.append('userId', userId)
     formData.append('audioFileUrl', audioFileUrl)
     const token = authService.getToken()
     const headers: Record<string, string> = {}
@@ -83,16 +81,15 @@ class CharacterService {
     return res.json()
   }
 
-  async listVoices(userId: string): Promise<ApiResponse<Voice[]>> {
-    const res = await fetch(`${this.getBaseUrl()}/listVoices/${encodeURIComponent(userId)}`, {
+  async listVoices(): Promise<ApiResponse<Voice[]>> {
+    const res = await fetch(`${this.getBaseUrl()}/listVoices`, {
       headers: this.getHeaders(),
     })
     return res.json()
   }
 
-  async deleteVoice(userId: string, voiceId: string): Promise<ApiResponse<boolean>> {
+  async deleteVoice(voiceId: string): Promise<ApiResponse<boolean>> {
     const query = new URLSearchParams()
-    query.set('userId', userId)
     query.set('voiceId', voiceId)
     const res = await fetch(`${this.getBaseUrl()}/deleteVoice?${query.toString()}`, {
       method: 'DELETE',

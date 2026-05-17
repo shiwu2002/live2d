@@ -377,7 +377,6 @@ const loadHistory = async () => {
   isLoadingHistory.value = true
   try {
     const page = await chatHistoryService.fetchHistory(
-      props.openid,
       historyNextId.value,
       20
     )
@@ -386,7 +385,7 @@ const loadHistory = async () => {
       return
     }
 
-    const historyMessages = page.records.map(historyToMessage).reverse()
+    const historyMessages = page.records.map(historyToMessage)
     messages.value.unshift(...historyMessages)
 
     historyNextId.value = page.nextId ?? undefined
