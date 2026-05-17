@@ -512,7 +512,10 @@ watch(
   [showChat, showVoiceCall, showUserAuthModal, showCharacterSettings, showCustomModelManager, showMemoryUpload, showMoreMenu],
   () => {
     if (!isDesktop.value) return
-    if (hasActiveInteractiveUI()) {
+    const hasUI = hasActiveInteractiveUI()
+    // 通知主进程交互界面状态（让主进程轮询也考虑此状态）
+    getApi()?.setInteractiveUIActive?.(hasUI)
+    if (hasUI) {
       applyMouseIgnore(false)
       console.log('交互界面打开，已禁用穿透')
     } else if (isBackgroundHidden.value && !mousePenetrationListener) {

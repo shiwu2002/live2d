@@ -10,6 +10,7 @@ let mouseIgnoreActive = false
 let penetrationPollInterval = null
 let backgroundHidden = false
 let lastPollIgnoreState = null
+let interactiveUIActive = false
 const TOOLBAR_ZONE_HEIGHT = 140 // 底部工具栏区域高度
 const POLL_INTERVAL_MS = 100
 
@@ -29,7 +30,7 @@ function startPenetrationPolling() {
         cursor.y >= winY && cursor.y <= winY + bounds.height
       if (!insideWindow) return
       const inToolbarZone = relativeY > bounds.height - TOOLBAR_ZONE_HEIGHT
-      const shouldIgnore = !inToolbarZone
+      const shouldIgnore = !inToolbarZone && !interactiveUIActive
       if (shouldIgnore !== lastPollIgnoreState) {
         lastPollIgnoreState = shouldIgnore
         mouseIgnoreActive = shouldIgnore
@@ -153,6 +154,20 @@ ipcMain.on('set-background-hidden', (_event, hidden) => {
     startPenetrationPolling()
   } else {
     stopPenetrationPolling()
+  }
+})
+
+// 渲染进程通知交互界面状态变化（弹窗打开/关闭时调用）
+ipcMain.on('set-interactive-ui-active', (_event, active) => {
+  interactiveUIActive = active
+  // 立即修正穿透状态
+  if (backgroundHidden && mainWindow && !mainWindow.isDestroyed()) {
+    const shouldIgnore = !interactiveUIActive
+    if (shouldIgnore !== lastPollIgnoreState) {
+      lastPollIgnoreState = shouldIgnore
+      mouseIgnoreActive = shouldIgnore
+      mainWindow.setIgnoreMouseEvents(shouldIgnore, { forward: true })
+    }
   }
 })
 

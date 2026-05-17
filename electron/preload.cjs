@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setIgnoreMouseEvents: (ignore, options) => ipcRenderer.send('set-ignore-mouse-events', ignore, options),
   // 启停主进程轮询（安全网）
   setBackgroundHidden: (hidden) => ipcRenderer.send('set-background-hidden', hidden),
+  // 通知主进程交互界面状态变化
+  setInteractiveUIActive: (active) => ipcRenderer.send('set-interactive-ui-active', active),
   focusWindow: () => ipcRenderer.send('focus-window'),
   // 主进程焦点事件
   onWindowBlurred: (callback) => {

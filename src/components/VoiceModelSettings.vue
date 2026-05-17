@@ -7,6 +7,11 @@
 
       <h2 class="vm-title">{{ showForm ? (editingId ? '编辑模型' : '添加模型') : '语音模型设置' }}</h2>
 
+      <div v-if="!showForm" class="vm-warning-banner">
+        <span class="vm-warning-icon">⚠️</span>
+        <span>此功能处于测试阶段，不建议自行配置模型</span>
+      </div>
+
       <div class="vm-body">
         <div v-if="!showForm">
           <div class="vm-tabs">
@@ -34,7 +39,6 @@
             <div v-if="currentModels.length > 0" class="vm-list">
               <div class="vm-list-header">
                 <span class="vm-list-count">{{ activeTab === 'tts' ? 'TTS' : 'ASR' }} 模型 ({{ currentModels.length }})</span>
-                <span class="vm-stream-tip">支持流式模式</span>
               </div>
               <div v-for="model in currentModels" :key="model.id" class="vm-card" :class="{ 'is-default': model.isDefault }">
                 <div class="vm-card-info">
@@ -44,9 +48,6 @@
                   </div>
                   <div class="vm-card-meta">
                     <span class="vm-tag" :class="'tag-' + model.modelType">{{ model.modelType === 'tts' ? 'TTS' : 'ASR' }}</span>
-                    <span class="vm-tag" :class="model.streamMode === 'stream' ? 'tag-stream' : 'tag-batch'">
-                      {{ model.streamMode === 'stream' ? '流式' : '批量' }}
-                    </span>
                     <span class="vm-card-id">{{ model.modelId }}</span>
                   </div>
                   <div v-if="model.baseUrl" class="vm-card-url">{{ model.baseUrl }}</div>
@@ -123,7 +124,7 @@
               <input
                 v-model="form.baseUrl"
                 type="text"
-                :placeholder="form.modelType === 'tts' ? '如：https://api.openai.com/v1/audio/speech' : '如：wss://api.example.com/v1/asr/stream（流式）或 https://api.example.com/v1/audio/transcriptions（批量）'"
+                :placeholder="form.modelType === 'tts' ? '如：wss://api.example.com/tts' : '如：wss://api.example.com/asr'"
                 required
               />
             </div>
@@ -149,19 +150,18 @@
                 <label>音色 (Voice)</label>
                 <input v-model="form.voice" type="text" placeholder="如：alloy、nova、longhua_v2（留空使用服务商默认）" />
               </div>
+              <div class="vm-field">
+                <label>音频格式</label>
+                <div class="vm-fixed-value">MP3</div>
+              </div>
+              <div class="vm-tip">当前 TTS 仅支持 CosyVoice 协议，请确保服务端已部署对应接口</div>
             </template>
 
             <template v-if="form.modelType === 'asr'">
               <div class="vm-row">
                 <div class="vm-field vm-field-half">
                   <label>音频格式</label>
-                  <select v-model="form.format">
-                    <option value="pcm">PCM</option>
-                    <option value="wav">WAV</option>
-                    <option value="mp3">MP3</option>
-                    <option value="ogg">OGG</option>
-                    <option value="flac">FLAC</option>
-                  </select>
+                  <div class="vm-fixed-value">PCM</div>
                 </div>
                 <div class="vm-field vm-field-half">
                   <label>采样率 (Hz)</label>
@@ -169,30 +169,6 @@
                 </div>
               </div>
             </template>
-
-            <div class="vm-field">
-              <label>调用模式 <em>*</em></label>
-              <div class="vm-stream-toggle">
-                <button
-                  type="button"
-                  class="vm-stream-btn"
-                  :class="{ active: form.streamMode === 'none' }"
-                  @click="form.streamMode = 'none'"
-                >
-                  <span class="vm-stream-label">批量模式 (none)</span>
-                  <span class="vm-stream-desc">录音结束后整段处理，兼容性好但延迟较高</span>
-                </button>
-                <button
-                  type="button"
-                  class="vm-stream-btn active recommended"
-                  :class="{ active: form.streamMode === 'stream' }"
-                  @click="form.streamMode = 'stream'"
-                >
-                  <span class="vm-stream-label">流式模式 (stream) ✅ 推荐</span>
-                  <span class="vm-stream-desc">实时传输，与DashScope体验一致，延迟更低</span>
-                </button>
-              </div>
-            </div>
 
             <div class="vm-field vm-checkbox-field">
               <label class="vm-checkbox-label">
@@ -256,7 +232,7 @@ const defaultForm = (type: 'tts' | 'asr'): VoiceModel => ({
   modelId: '',
   apiKey: '',
   voice: type === 'tts' ? '' : undefined,
-  format: type === 'asr' ? 'pcm' : undefined,
+  format: type === 'asr' ? 'pcm' : 'mp3',
   sampleRate: type === 'asr' ? 16000 : undefined,
   streamMode: 'stream',
   isDefault: false
@@ -744,6 +720,40 @@ onMounted(() => {
   border-color: #FF6B9D;
   box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.1);
 }
+
+.vm-fixed-value {
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #aaa;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.vm-tip {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(108, 92, 231, 0.08);
+  color: #a29bfe;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.vm-warning-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 22px 4px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.2);
+  color: #ffc107;
+  font-size: 13px;
+  font-weight: 500;
+}
+.vm-warning-icon { font-size: 15px; }
 
 .vm-row { display: flex; gap: 12px; }
 .vm-field-half { flex: 1; }
