@@ -50,6 +50,13 @@
       @close="showMemoryUpload = false"
     />
 
+    <VoiceModelSettings
+      :visible="showVoiceModelSettings"
+      :userId="currentUser?.openid || ''"
+      @close="showVoiceModelSettings = false"
+      @changed="handleVoiceModelsChanged"
+    />
+
     <div v-if="discoveredModels.length > 0" class="pet-container desktop-pet">
       <div class="background-board" :class="{ 'hidden': !showBackground }">
         <div class="drag-handle-top-right" @mousedown="handleDragStart" title="拖拽移动窗口">
@@ -152,6 +159,15 @@
               </button>
               <button
                 class="dropdown-item"
+                @click="toggleVoiceModelSettings(); showMoreMenu = false"
+                :style="!isLoggedIn ? 'opacity:0.4' : ''"
+                title="语音模型设置"
+              >
+                <span class="dropdown-emoji">🎙️</span>
+                <span>语音模型</span>
+              </button>
+              <button
+                class="dropdown-item"
                 @click="toggleMemoryUpload(); showMoreMenu = false"
                 :style="!isLoggedIn ? 'opacity:0.4' : ''"
                 title="对话记忆"
@@ -231,6 +247,7 @@ import UserAuthModal from './components/UserAuthModal.vue'
 import CharacterSettings from './components/CharacterSettings.vue'
 import CustomModelManager from './components/CustomModelManager.vue'
 import MemoryUpload from './components/MemoryUpload.vue'
+import VoiceModelSettings from './components/VoiceModelSettings.vue'
 import { autoModelConfig, getValidAutoModelIds } from './config/auto-models'
 import { getChatConfig, generateSessionId } from './config'
 import { getWebSocketUrl, logEnvConfig } from './config'
@@ -367,6 +384,9 @@ const showCustomModelManager = ref(false)
 // 记忆上传窗口状态
 const showMemoryUpload = ref(false)
 
+// 语音模型设置窗口状态
+const showVoiceModelSettings = ref(false)
+
 // 更多菜单下拉状态
 const showMoreMenu = ref(false)
 
@@ -389,6 +409,7 @@ const hasActiveInteractiveUI = () => {
     showCharacterSettings.value ||
     showCustomModelManager.value ||
     showMemoryUpload.value ||
+    showVoiceModelSettings.value ||
     showMoreMenu.value
   )
 }
@@ -607,9 +628,23 @@ const toggleMemoryUpload = () => {
   showMemoryUpload.value = !showMemoryUpload.value
 }
 
+// 切换语音模型设置窗口
+const toggleVoiceModelSettings = () => {
+  if (!isLoggedIn.value) {
+    showMessage('请先登录', 'error')
+    return
+  }
+  showVoiceModelSettings.value = !showVoiceModelSettings.value
+}
+
 // 自定义模型变更回调
 const handleCustomModelsChanged = () => {
   loadAiModels()
+}
+
+// 语音模型变更回调
+const handleVoiceModelsChanged = () => {
+  console.log('语音模型配置已更新')
 }
 
 

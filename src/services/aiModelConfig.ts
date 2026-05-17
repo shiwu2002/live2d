@@ -161,7 +161,7 @@ export class AiModelConfigService {
     }
     const token = authService.getToken()
     if (token) {
-      headers['Authorization'] = token
+      headers['Authorization'] = `Bearer ${token}`
     }
     return headers
   }
@@ -638,7 +638,7 @@ export class AiModelSwitchService {
     }
     const token = authService.getToken()
     if (token) {
-      headers['Authorization'] = token
+      headers['Authorization'] = `Bearer ${token}`
     }
     return headers
   }

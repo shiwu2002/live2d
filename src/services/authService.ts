@@ -159,7 +159,7 @@ export class AuthService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': token
+          'Authorization': `Bearer ${token}`
         },
         body: formData.toString()
       })

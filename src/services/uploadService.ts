@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from '../config'
+import { authService } from './authService'
 
 class UploadService {
   private getBaseUrl(): string {
@@ -7,8 +8,8 @@ class UploadService {
 
   private getAuthHeaders(): Record<string, string> {
     const headers: Record<string, string> = {}
-    const token = localStorage.getItem('authToken')
-    if (token) headers['Authorization'] = token
+    const token = authService.getToken()
+    if (token) headers['Authorization'] = `Bearer ${token}`
     return headers
   }
 

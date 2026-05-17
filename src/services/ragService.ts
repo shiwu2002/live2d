@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from '../config'
+import { authService } from './authService'
 
 interface MemoryDocument {
   id: number
@@ -36,8 +37,8 @@ class RagService {
 
   private getAuthHeaders(): Record<string, string> {
     const headers: Record<string, string> = {}
-    const token = localStorage.getItem('authToken') || localStorage.getItem('auth_token')
-    if (token) headers['Authorization'] = token
+    const token = authService.getToken()
+    if (token) headers['Authorization'] = `Bearer ${token}`
     return headers
   }
 

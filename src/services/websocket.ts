@@ -4,6 +4,7 @@
  */
 
 import type { Live2DAnimationCommand } from '../types/live2d'
+import { authService } from './authService'
 
 export type MessageType = 'TEXT' | 'AUDIO' | 'CONTROL' | 'ERROR' | 'PING' | 'PONG' | 'IMAGES'
 
@@ -112,6 +113,10 @@ export class WebSocketService {
     
     // 添加认证参数
     const params = new URLSearchParams()
+    const token = authService.getToken()
+    if (token) {
+      params.append('token', token)
+    }
     if (openid) {
       params.append('openid', openid)
     }

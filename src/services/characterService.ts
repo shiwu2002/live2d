@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from '../config'
+import { authService } from './authService'
 import type { CharacterInfoDto, CharacterInfo, Voice, PageResult, ApiResponse } from '../types/character'
 
 class CharacterService {
@@ -8,8 +9,8 @@ class CharacterService {
 
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    const token = localStorage.getItem('authToken')
-    if (token) headers['Authorization'] = token
+    const token = authService.getToken()
+    if (token) headers['Authorization'] = `Bearer ${token}`
     return headers
   }
 
@@ -71,9 +72,9 @@ class CharacterService {
     const formData = new URLSearchParams()
     formData.append('userId', userId)
     formData.append('audioFileUrl', audioFileUrl)
-    const token = localStorage.getItem('authToken')
+    const token = authService.getToken()
     const headers: Record<string, string> = {}
-    if (token) headers['Authorization'] = token
+    if (token) headers['Authorization'] = `Bearer ${token}`
     const res = await fetch(`${this.getBaseUrl()}/updateVoice`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' },
