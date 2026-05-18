@@ -255,6 +255,7 @@ import { getDisplayConfig } from './config/display'
 import type { UserLoginInfo, UserInfo } from './types/login'
 import type { Live2DAnimationCommand } from './types/live2d'
 import { authService } from './services/authService'
+import { setUnauthorizedHandler } from './services/httpClient'
 import { aiModelConfigService, aiModelSwitchService, type ModelConfig } from './services/aiModelConfig'
 
 import iconLogin from './images/zhanghudenglu-icon.png'
@@ -695,6 +696,13 @@ const handleLogout = () => {
   authService.logout()
   console.log('已退出登录')
 }
+
+// 注册 401 未授权回调：token 失效时自动退出登录
+setUnauthorizedHandler(() => {
+  if (isLoggedIn.value) {
+    handleLogout()
+  }
+})
 
 /**
  * 加载 AI 模型列表

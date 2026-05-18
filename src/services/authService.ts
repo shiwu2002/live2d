@@ -12,6 +12,7 @@ import type {
   ApiResponse
 } from '../types/login'
 import { getApiBaseUrl } from '../config'
+import { fetchWithAuth } from './httpClient'
 
 export class AuthService {
   private baseUrl: string
@@ -136,12 +137,10 @@ export class AuthService {
    */
   async changePassword(data: ChangePasswordRequest): Promise<ApiResponse<string>> {
     try {
-      const token = this.getToken()
-      if (!token) {
+      if (!this.getToken()) {
         throw new Error('请先登录')
       }
 
-      // 验证参数
       if (!data.oldPassword || !data.newPassword) {
         throw new Error('旧密码和新密码不能为空')
       }
@@ -150,17 +149,13 @@ export class AuthService {
         throw new Error('新密码长度至少为6位')
       }
 
-      // 构建表单数据
       const formData = new URLSearchParams()
       formData.append('oldPassword', data.oldPassword)
       formData.append('newPassword', data.newPassword)
 
-      const response = await fetch(`${this.baseUrl}/auth/changePassword`, {
+      const response = await fetchWithAuth(`${this.baseUrl}/auth/changePassword`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: formData.toString()
       })
 

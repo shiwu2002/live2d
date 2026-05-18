@@ -1,5 +1,5 @@
 import { getApiBaseUrl } from '../config'
-import { authService } from './authService'
+import { fetchWithAuth } from './httpClient'
 import type { CharacterInfoDto, CharacterInfo, Voice, PageResult, ApiResponse } from '../types/character'
 
 class CharacterService {
@@ -7,51 +7,48 @@ class CharacterService {
     return getApiBaseUrl() + '/api/character'
   }
 
-  private getHeaders(): Record<string, string> {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    const token = authService.getToken()
-    if (token) headers['Authorization'] = `Bearer ${token}`
-    return headers
+  private async request(url: string, options?: RequestInit): Promise<Response> {
+    return fetchWithAuth(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+    })
   }
 
   async create(data: CharacterInfoDto): Promise<ApiResponse<boolean>> {
-    const res = await fetch(this.getBaseUrl(), {
+    const res = await this.request(this.getBaseUrl(), {
       method: 'POST',
-      headers: this.getHeaders(),
       body: JSON.stringify(data),
     })
     return res.json()
   }
 
   async saveOrUpdate(data: CharacterInfoDto): Promise<ApiResponse<boolean>> {
-    const res = await fetch(`${this.getBaseUrl()}/saveOrUpdate`, {
+    const res = await this.request(`${this.getBaseUrl()}/saveOrUpdate`, {
       method: 'POST',
-      headers: this.getHeaders(),
       body: JSON.stringify(data),
     })
     return res.json()
   }
 
   async get(): Promise<ApiResponse<CharacterInfo>> {
-    const res = await fetch(this.getBaseUrl(), {
-      headers: this.getHeaders(),
-    })
+    const res = await this.request(this.getBaseUrl())
     return res.json()
   }
 
   async update(data: CharacterInfoDto): Promise<ApiResponse<boolean>> {
-    const res = await fetch(this.getBaseUrl(), {
+    const res = await this.request(this.getBaseUrl(), {
       method: 'PUT',
-      headers: this.getHeaders(),
       body: JSON.stringify(data),
     })
     return res.json()
   }
 
   async delete(): Promise<ApiResponse<boolean>> {
-    const res = await fetch(this.getBaseUrl(), {
+    const res = await this.request(this.getBaseUrl(), {
       method: 'DELETE',
-      headers: this.getHeaders(),
     })
     return res.json()
   }
@@ -61,39 +58,31 @@ class CharacterService {
     if (params.pageNum) query.set('pageNum', String(params.pageNum))
     if (params.pageSize) query.set('pageSize', String(params.pageSize))
     if (params.name) query.set('name', params.name)
-    const res = await fetch(`${this.getBaseUrl()}/page?${query.toString()}`, {
-      headers: this.getHeaders(),
-    })
+    const res = await this.request(`${this.getBaseUrl()}/page?${query.toString()}`)
     return res.json()
   }
 
   async updateVoice(audioFileUrl: string): Promise<ApiResponse<string>> {
     const formData = new URLSearchParams()
     formData.append('audioFileUrl', audioFileUrl)
-    const token = authService.getToken()
-    const headers: Record<string, string> = {}
-    if (token) headers['Authorization'] = `Bearer ${token}`
-    const res = await fetch(`${this.getBaseUrl()}/updateVoice`, {
+    const res = await fetchWithAuth(`${this.getBaseUrl()}/updateVoice`, {
       method: 'POST',
-      headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: formData.toString(),
     })
     return res.json()
   }
 
   async listVoices(): Promise<ApiResponse<Voice[]>> {
-    const res = await fetch(`${this.getBaseUrl()}/listVoices`, {
-      headers: this.getHeaders(),
-    })
+    const res = await this.request(`${this.getBaseUrl()}/listVoices`)
     return res.json()
   }
 
   async deleteVoice(voiceId: string): Promise<ApiResponse<boolean>> {
     const query = new URLSearchParams()
     query.set('voiceId', voiceId)
-    const res = await fetch(`${this.getBaseUrl()}/deleteVoice?${query.toString()}`, {
+    const res = await this.request(`${this.getBaseUrl()}/deleteVoice?${query.toString()}`, {
       method: 'DELETE',
-      headers: this.getHeaders(),
     })
     return res.json()
   }

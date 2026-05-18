@@ -4,7 +4,7 @@
  */
 
 import { getApiBaseUrl } from '../config'
-import { authService } from './authService'
+import { fetchWithAuth } from './httpClient'
 
 // ==================== 类型定义 ====================
 
@@ -152,30 +152,13 @@ export class AiModelConfigService {
     this.baseUrl = getApiBaseUrl()
   }
 
-  /**
-   * 获取请求头（包含认证token）
-   */
-  private getHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    }
-    const token = authService.getToken()
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`
-    }
-    return headers
-  }
-
-  /**
-   * 执行带认证的请求
-   */
-  private async fetchWithAuth(url: string, options?: RequestInit): Promise<Response> {
-    return fetch(url, {
+  private async request(url: string, options?: RequestInit): Promise<Response> {
+    return fetchWithAuth(url, {
       ...options,
       headers: {
-        ...this.getHeaders(),
-        ...options?.headers
-      }
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
     })
   }
 
@@ -184,7 +167,7 @@ export class AiModelConfigService {
    */
   async getAllModels(): Promise<ModelConfig[]> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai-model-config/list`)
+      const response = await this.request(`${this.baseUrl}/api/ai-model-config/list`)
       const result: ApiResponse<ModelConfig[]> = await response.json()
 
       if (result.code === 200) {
@@ -204,7 +187,7 @@ export class AiModelConfigService {
    */
   async getModelsByVendor(vendorCode: string): Promise<ModelConfig[]> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai-model-config/list/${vendorCode}`)
+      const response = await this.request(`${this.baseUrl}/api/ai-model-config/list/${vendorCode}`)
       const result: ApiResponse<ModelConfig[]> = await response.json()
 
       if (result.code === 200) {
@@ -224,7 +207,7 @@ export class AiModelConfigService {
    */
   async getAllVendors(): Promise<VendorInfo[]> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai-model-config/vendors`)
+      const response = await this.request(`${this.baseUrl}/api/ai-model-config/vendors`)
       const result: ApiResponse<VendorInfo[]> = await response.json()
 
       if (result.code === 200) {
@@ -244,7 +227,7 @@ export class AiModelConfigService {
    */
   async getDefaultModel(): Promise<ModelConfig | null> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai-model-config/default`)
+      const response = await this.request(`${this.baseUrl}/api/ai-model-config/default`)
       const result: ApiResponse<ModelConfig[]> = await response.json()
 
       if (result.code === 200 && result.data.length > 0) {
@@ -263,7 +246,7 @@ export class AiModelConfigService {
    */
   async getStreamModels(): Promise<ModelConfig[]> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai-model-config/stream`)
+      const response = await this.request(`${this.baseUrl}/api/ai-model-config/stream`)
       const result: ApiResponse<ModelConfig[]> = await response.json()
 
       if (result.code === 200) {
@@ -283,7 +266,7 @@ export class AiModelConfigService {
    */
   async getDisplayModels(): Promise<ModelConfig[]> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai-model-config/display`)
+      const response = await this.request(`${this.baseUrl}/api/ai-model-config/display`)
       const result: ApiResponse<ModelConfig[]> = await response.json()
 
       if (result.code === 200) {
@@ -304,7 +287,7 @@ export class AiModelConfigService {
   async getDisplayModelsWithHealth(): Promise<ModelConfig[]> {
     try {
       // 先获取模型列表（使用 display API）
-      const modelsResponse = await this.fetchWithAuth(`${this.baseUrl}/api/ai-model-config/display`)
+      const modelsResponse = await this.request(`${this.baseUrl}/api/ai-model-config/display`)
       const modelsResult: ApiResponse<ModelConfig[]> = await modelsResponse.json()
 
       if (modelsResult.code !== 200) {
@@ -321,7 +304,7 @@ export class AiModelConfigService {
       // 尝试获取健康状态（可选，不影响模型列表展示）
       const healthMap = new Map<string, boolean>()
       try {
-        const protocolsResponse = await this.fetchWithAuth(`${this.baseUrl}/api/ai/protocols`)
+        const protocolsResponse = await this.request(`${this.baseUrl}/api/ai/protocols`)
         const protocolsResult: ApiResponse<{ total: number; protocols: Record<string, { healthy: boolean; model: string }>; timestamp: number }> = await protocolsResponse.json()
 
         if (protocolsResult.code === 200 && protocolsResult.data && protocolsResult.data.protocols) {
@@ -371,7 +354,7 @@ export class AiModelConfigService {
   async checkModel(fullIdentifier: string): Promise<boolean> {
     try {
       const encoded = encodeURIComponent(fullIdentifier)
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai-model-config/check/${encoded}`)
+      const response = await this.request(`${this.baseUrl}/api/ai-model-config/check/${encoded}`)
       const result: ApiResponse<{ fullIdentifier: string; available: boolean }> = await response.json()
 
       if (result.code === 200) {
@@ -391,7 +374,7 @@ export class AiModelConfigService {
   async getModelDetail(fullIdentifier: string): Promise<ModelConfig | null> {
     try {
       const encoded = encodeURIComponent(fullIdentifier)
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai-model-config/detail/${encoded}`)
+      const response = await this.request(`${this.baseUrl}/api/ai-model-config/detail/${encoded}`)
       const result: ApiResponse<ModelConfig> = await response.json()
 
       if (result.code === 200) {
@@ -411,7 +394,7 @@ export class AiModelConfigService {
    */
   async getProtocols(): Promise<ProtocolInfo[]> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai-model-config/protocols`)
+      const response = await this.request(`${this.baseUrl}/api/ai-model-config/protocols`)
       const result: ApiResponse<ProtocolInfo[]> = await response.json()
 
       if (result.code === 200) {
@@ -431,7 +414,7 @@ export class AiModelConfigService {
    */
   async getProtocolHealth(): Promise<ProtocolHealthInfo[]> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai/protocols`)
+      const response = await this.request(`${this.baseUrl}/api/ai/protocols`)
       const result: ApiResponse<{ total: number; protocols: Record<string, { healthy: boolean; model: string; description?: string }>; timestamp: number }> = await response.json()
 
       if (result.code === 200 && result.data && result.data.protocols) {
@@ -464,7 +447,7 @@ export class AiModelConfigService {
    */
   async getDisplayModelsWithCustom(): Promise<CustomModelDisplayInfo[]> {
     try {
-      const response = await this.fetchWithAuth(
+      const response = await this.request(
         `${this.baseUrl}/api/ai-model-config/display-with-custom`
       )
       const result: ApiResponse<CustomModelDisplayInfo[]> = await response.json()
@@ -486,7 +469,7 @@ export class AiModelConfigService {
    */
   async getUserCustomModels(): Promise<Map<string, any>[]> {
     try {
-      const response = await this.fetchWithAuth(
+      const response = await this.request(
         `${this.baseUrl}/api/custom-model/list`
       )
       const result: ApiResponse<Map<string, any>[]> = await response.json()
@@ -508,7 +491,7 @@ export class AiModelConfigService {
    */
   async createCustomModel(model: UserCustomModel): Promise<any | null> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/custom-model/create`, {
+      const response = await this.request(`${this.baseUrl}/api/custom-model/create`, {
         method: 'POST',
         body: JSON.stringify(model)
       })
@@ -531,7 +514,7 @@ export class AiModelConfigService {
    */
   async updateCustomModel(id: number, model: UserCustomModel): Promise<any | null> {
     try {
-      const response = await this.fetchWithAuth(
+      const response = await this.request(
         `${this.baseUrl}/api/custom-model/update/${id}`,
         {
           method: 'PUT',
@@ -557,7 +540,7 @@ export class AiModelConfigService {
    */
   async deleteCustomModel(id: number): Promise<boolean> {
     try {
-      const response = await this.fetchWithAuth(
+      const response = await this.request(
         `${this.baseUrl}/api/custom-model/delete/${id}`,
         { method: 'DELETE' }
       )
@@ -580,7 +563,7 @@ export class AiModelConfigService {
    */
   async setDefaultCustomModel(id: number): Promise<boolean> {
     try {
-      const response = await this.fetchWithAuth(
+      const response = await this.request(
         `${this.baseUrl}/api/custom-model/set-default/${id}`,
         { method: 'POST' }
       )
@@ -625,35 +608,11 @@ export class AiModelSwitchService {
   private baseUrl: string
 
   constructor() {
-    // 开发环境下使用空字符串（相对路径），生产环境使用完整地址
     this.baseUrl = getApiBaseUrl()
   }
 
-  /**
-   * 获取请求头（包含认证token）
-   */
-  private getHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    }
-    const token = authService.getToken()
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`
-    }
-    return headers
-  }
-
-  /**
-   * 执行带认证的请求
-   */
-  private async fetchWithAuth(url: string, options?: RequestInit): Promise<Response> {
-    return fetch(url, {
-      ...options,
-      headers: {
-        ...this.getHeaders(),
-        ...options?.headers
-      }
-    })
+  private async request(url: string, options?: RequestInit): Promise<Response> {
+    return fetchWithAuth(url, options)
   }
 
   /**
@@ -663,7 +622,7 @@ export class AiModelSwitchService {
   async switchModel(model: string): Promise<SwitchResponse> {
     try {
       const encodedModel = encodeURIComponent(model)
-      const response = await this.fetchWithAuth(
+      const response = await this.request(
         `${this.baseUrl}/api/ai/switch?model=${encodedModel}`,
         { method: 'POST' }
       )
@@ -688,7 +647,7 @@ export class AiModelSwitchService {
    */
   async getVendors(): Promise<{ total: number; vendors: Record<string, VendorStatus> }> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai/protocols`)
+      const response = await this.request(`${this.baseUrl}/api/ai/protocols`)
       const result: ApiResponse<{ total: number; protocols: Record<string, VendorStatus>; timestamp: number }> = await response.json()
 
       if (result.code === 200 && result.data) {
@@ -716,7 +675,7 @@ export class AiModelSwitchService {
     timestamp: number
   }> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai/current`)
+      const response = await this.request(`${this.baseUrl}/api/ai/current`)
       const result: ApiResponse<{
         cachedClients: Record<string, any>
         registeredProtocols: string[]
@@ -774,7 +733,7 @@ export class AiModelSwitchService {
         url += `&prompt=${encodedPrompt}`
       }
 
-      const response = await this.fetchWithAuth(url, { method: 'POST' })
+      const response = await this.request(url, { method: 'POST' })
       const result: ApiResponse<any> = await response.json()
 
       if (result.code === 200) {
@@ -794,7 +753,7 @@ export class AiModelSwitchService {
    */
   async clearCache(key: string): Promise<void> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai/cache/${encodeURIComponent(key)}`, {
+      const response = await this.request(`${this.baseUrl}/api/ai/cache/${encodeURIComponent(key)}`, {
         method: 'DELETE'
       })
       const result: ApiResponse<any> = await response.json()
@@ -812,7 +771,7 @@ export class AiModelSwitchService {
    */
   async clearAllCache(): Promise<void> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai/cache/all`, {
+      const response = await this.request(`${this.baseUrl}/api/ai/cache/all`, {
         method: 'DELETE'
       })
       const result: ApiResponse<any> = await response.json()
@@ -831,7 +790,7 @@ export class AiModelSwitchService {
   async setUserPreference(model: string): Promise<SetPreferenceResponse> {
     try {
       const encodedModel = encodeURIComponent(model)
-      const response = await this.fetchWithAuth(
+      const response = await this.request(
         `${this.baseUrl}/api/ai/user/preference?model=${encodedModel}`,
         { method: 'POST' }
       )
@@ -854,7 +813,7 @@ export class AiModelSwitchService {
    */
   async getUserPreference(): Promise<UserPreference | null> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai/user/preference`)
+      const response = await this.request(`${this.baseUrl}/api/ai/user/preference`)
       const result: ApiResponse<UserPreference> = await response.json()
 
       if (result.code === 200) {
@@ -874,7 +833,7 @@ export class AiModelSwitchService {
    */
   async clearUserPreference(): Promise<SetPreferenceResponse> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai/user/preference`, {
+      const response = await this.request(`${this.baseUrl}/api/ai/user/preference`, {
         method: 'DELETE'
       })
       const result: ApiResponse<SetPreferenceResponse> = await response.json()
@@ -896,7 +855,7 @@ export class AiModelSwitchService {
    */
   async getUserClient(): Promise<UserClientInfo | null> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/ai/user/client`)
+      const response = await this.request(`${this.baseUrl}/api/ai/user/client`)
       const result: ApiResponse<UserClientInfo> = await response.json()
 
       if (result.code === 200) {

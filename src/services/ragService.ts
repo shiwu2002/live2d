@@ -1,5 +1,5 @@
 import { getApiBaseUrl } from '../config'
-import { authService } from './authService'
+import { fetchWithAuth } from './httpClient'
 
 interface MemoryDocument {
   id: number
@@ -35,13 +35,6 @@ class RagService {
     return getApiBaseUrl()
   }
 
-  private getAuthHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {}
-    const token = authService.getToken()
-    if (token) headers['Authorization'] = `Bearer ${token}`
-    return headers
-  }
-
   async uploadMemoryFile(
     file: File,
     aiSessionId?: string
@@ -52,9 +45,8 @@ class RagService {
       formData.append('aiSessionId', aiSessionId)
     }
 
-    const response = await fetch(`${this.getBaseUrl()}/rag/memory/upload`, {
+    const response = await fetchWithAuth(`${this.getBaseUrl()}/rag/memory/upload`, {
       method: 'POST',
-      headers: this.getAuthHeaders(),
       body: formData,
     })
 
@@ -70,14 +62,11 @@ class RagService {
       params.append('aiSessionId', aiSessionId)
     }
 
-    const response = await fetch(
+    const response = await fetchWithAuth(
       `${this.getBaseUrl()}/rag/memory/upload-json?${params.toString()}`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...this.getAuthHeaders(),
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(jsonContent),
       }
     )
@@ -86,35 +75,19 @@ class RagService {
   }
 
   async getMemoryList(): Promise<ApiResponse<MemoryDocument[]>> {
-    const response = await fetch(
-      `${this.getBaseUrl()}/rag/memory/list`,
-      {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      }
-    )
-
+    const response = await fetchWithAuth(`${this.getBaseUrl()}/rag/memory/list`)
     return response.json()
   }
 
   async getMemoryDetail(id: number): Promise<ApiResponse<MemoryDocument>> {
-    const response = await fetch(`${this.getBaseUrl()}/rag/memory/${id}`, {
-      method: 'GET',
-      headers: this.getAuthHeaders(),
-    })
-
+    const response = await fetchWithAuth(`${this.getBaseUrl()}/rag/memory/${id}`)
     return response.json()
   }
 
   async deleteMemory(id: number): Promise<ApiResponse<null>> {
-    const response = await fetch(
-      `${this.getBaseUrl()}/rag/memory/${id}`,
-      {
-        method: 'DELETE',
-        headers: this.getAuthHeaders(),
-      }
-    )
-
+    const response = await fetchWithAuth(`${this.getBaseUrl()}/rag/memory/${id}`, {
+      method: 'DELETE',
+    })
     return response.json()
   }
 }
