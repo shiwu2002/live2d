@@ -342,7 +342,6 @@ const initializeServices = async () => {
     loadHistory()
   } catch (error) {
     console.error('初始化聊天服务失败:', error)
-    alert('连接失败，请检查 WebSocket 服务器地址')
   }
 }
 
@@ -459,7 +458,6 @@ const handleConnection = (connected: boolean) => {
  */
 const handleError = (error: Error) => {
   console.error('聊天错误:', error)
-  alert(`错误: ${error.message}`)
 }
 
 /**

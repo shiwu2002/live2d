@@ -155,7 +155,7 @@
                 title="自定义模型"
               >
                 <span class="dropdown-emoji">🔧</span>
-                <span>自定义模型</span>
+                <span>自定义LLM模型</span>
               </button>
               <button
                 class="dropdown-item"
@@ -164,7 +164,7 @@
                 title="语音模型设置"
               >
                 <span class="dropdown-emoji">🎙️</span>
-                <span>语音模型</span>
+                <span>自定义语音模型</span>
               </button>
               <button
                 class="dropdown-item"
@@ -173,7 +173,7 @@
                 title="对话记忆"
               >
                 <span class="dropdown-emoji">📝</span>
-                <span>对话记忆</span>
+                <span>外部记忆导入</span>
               </button>
               <button
                 class="dropdown-item"
@@ -581,12 +581,14 @@ const handleAnimation = (command: Live2DAnimationCommand) => {
 
 // 切换聊天窗口
 const toggleChat = () => {
+  if (!requireAuth()) return
   showChat.value = !showChat.value
   console.log(`聊天窗口: ${showChat.value ? '打开' : '关闭'}`)
 }
 
 // 切换语音通话窗口
 const toggleVoiceCall = () => {
+  if (!requireAuth()) return
   showVoiceCall.value = !showVoiceCall.value
   console.log(`语音通话窗口: ${showVoiceCall.value ? '打开' : '关闭'}`)
 }
@@ -600,10 +602,7 @@ const toggleUserAuthModal = () => {
 
 // 切换角色设置窗口
 const toggleCharacterSettings = () => {
-  if (!isLoggedIn.value) {
-    showMessage('请先登录', 'error')
-    return
-  }
+  if (!requireAuth()) return
   showCharacterSettings.value = !showCharacterSettings.value
 }
 
@@ -615,28 +614,19 @@ const handleCharacterSaved = (character: any) => {
 
 // 切换自定义模型管理窗口
 const toggleCustomModelManager = () => {
-  if (!isLoggedIn.value) {
-    showMessage('请先登录', 'error')
-    return
-  }
+  if (!requireAuth()) return
   showCustomModelManager.value = !showCustomModelManager.value
 }
 
 // 切换记忆上传窗口
 const toggleMemoryUpload = () => {
-  if (!isLoggedIn.value) {
-    showMessage('请先登录', 'error')
-    return
-  }
+  if (!requireAuth()) return
   showMemoryUpload.value = !showMemoryUpload.value
 }
 
 // 切换语音模型设置窗口
 const toggleVoiceModelSettings = () => {
-  if (!isLoggedIn.value) {
-    showMessage('请先登录', 'error')
-    return
-  }
+  if (!requireAuth()) return
   showVoiceModelSettings.value = !showVoiceModelSettings.value
 }
 
@@ -772,6 +762,18 @@ const showMessage = (text: string, type: 'success' | 'error') => {
   setTimeout(() => {
     preferenceMessage.value = null
   }, 3000)
+}
+
+/**
+ * 要求用户登录才能使用功能
+ * 未登录时弹出登录窗口并返回 false
+ */
+const requireAuth = (): boolean => {
+  if (!isLoggedIn.value) {
+    showUserAuthModal.value = true
+    return false
+  }
+  return true
 }
 
 /**
