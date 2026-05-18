@@ -23,7 +23,6 @@ export interface EnvConfig {
   wsEndpoints: {
     chat: string          // 聊天服务
     voice: string         // 语音通话服务
-    qrcodeLogin: string   // 扫码登录服务
   }
 }
 
@@ -69,8 +68,7 @@ const developmentConfig: EnvConfig = {
   wsBaseUrl: 'ws://localhost:8080',
   wsEndpoints: {
     chat: '/ws/chat',
-    voice: '/ws/voice',
-    qrcodeLogin: '/ws/qrcode-login'
+    voice: '/ws/voice'
   }
 }
 
@@ -82,8 +80,7 @@ const productionConfig: EnvConfig = {
   wsBaseUrl: 'wss://shiwu.shop',  // 使用 wss:// 协议，Nginx 会代理转换为 ws://
   wsEndpoints: {
     chat: '/ws/chat',
-    voice: '/ws/voice',
-    qrcodeLogin: '/ws/qrcode-login'
+    voice: '/ws/voice'
   }
 }
 
@@ -173,8 +170,7 @@ export function getApiBaseUrl(): string {
 export function getAllWebSocketUrls() {
   return {
     chat: getWebSocketUrl('chat'),
-    voice: getWebSocketUrl('voice'),
-    qrcodeLogin: getWebSocketUrl('qrcodeLogin')
+    voice: getWebSocketUrl('voice')
   }
 }
 
@@ -210,7 +206,6 @@ export function logEnvConfig(): void {
   console.log('WebSocket 端点:')
   console.log('  - 聊天服务:', getWebSocketUrl('chat'))
   console.log('  - 语音通话:', getWebSocketUrl('voice'))
-  console.log('  - 扫码登录:', getWebSocketUrl('qrcodeLogin'))
   console.log('============================')
 }
 
