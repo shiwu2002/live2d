@@ -1,5 +1,5 @@
 import { getApiBaseUrl } from '../config'
-import { authService } from './authService'
+import { fetchWithAuth } from './httpClient'
 
 export interface HistoryRecord {
   id: number
@@ -20,21 +20,13 @@ class ChatHistoryService {
     return getApiBaseUrl()
   }
 
-  private getAuthHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {}
-    const token = authService.getToken()
-    if (token) headers['Authorization'] = `Bearer ${token}`
-    return headers
-  }
-
   async fetchHistory(lastId?: number, pageSize = 20): Promise<HistoryPage> {
     const params = new URLSearchParams()
     if (lastId !== undefined && lastId > 0) params.append('lastId', String(lastId))
     params.append('pageSize', String(pageSize))
 
-    const res = await fetch(
-      `${this.getBaseUrl()}/api/session/user/history/keyset?${params}`,
-      { headers: this.getAuthHeaders() }
+    const res = await fetchWithAuth(
+      `${this.getBaseUrl()}/api/session/user/history/keyset?${params}`
     )
     const json = await res.json()
     if (json.code !== 200) throw new Error(json.msg || '加载历史失败')

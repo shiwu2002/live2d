@@ -18,6 +18,9 @@ concurrency:
   group: "pages"
   cancel-in-progress: false
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   # 构建前端项目
   build-and-deploy:
@@ -30,19 +33,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. 安装 Node.js（指定版本，建议和本地一致，比如18/20）
+      # 2. 安装 Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: "npm" # 缓存依赖，加速下次构建
+          node-version: "22"
+          cache: "npm"
 
       # 3. 安装项目依赖
       - name: Install dependencies
         run: npm install
 
-      # 4. 打包构建（核心步骤！生产环境打包）
-      # 若你的打包命令不是 npm run build，替换成实际的（比如 yarn build）
+      # 4. 打包构建（生产环境打包）
       - name: Build project
         run: npm run build
 
@@ -50,11 +52,11 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      # 6. 上传打包产物（默认打包后在 dist 目录，若你的是 build 目录，改成 build）
+      # 6. 上传打包产物
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dist # 关键：前端打包后的目录（Vue/Vite 默认 dist，React CRA 默认 build）
+          path: ./dist
 
       # 7. 部署到 GitHub Pages
       - name: Deploy to GitHub Pages

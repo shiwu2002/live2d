@@ -2,26 +2,6 @@
  * 登录相关类型定义
  */
 
-// 扫码登录状态
-export const QRCodeLoginStatus = {
-  PENDING: 'pending',        // 等待扫码
-  SCANNED: 'scanned',        // 已扫码
-  CONFIRMED: 'confirmed',    // 已确认
-  EXPIRED: 'expired',        // 已过期
-  CANCELED: 'canceled'       // 已取消
-} as const
-
-export type QRCodeLoginStatus = typeof QRCodeLoginStatus[keyof typeof QRCodeLoginStatus]
-
-// 登录二维码信息
-export interface QRCodeInfo {
-  qrcodeId: string           // 二维码唯一标识
-  qrcodeUrl: string          // 二维码数据URL
-  status: QRCodeLoginStatus  // 当前状态
-  expireTime: number         // 过期时间戳
-  createTime: number         // 创建时间戳
-}
-
 // 用户登录信息
 export interface UserLoginInfo {
   openid: string             // 用户唯一标识
@@ -29,36 +9,6 @@ export interface UserLoginInfo {
   avatar?: string            // 用户头像
   sessionId: string          // 会话ID
   token?: string             // 登录token（可选）
-}
-
-// 扫码登录响应
-export interface QRCodeLoginResponse {
-  success: boolean
-  status: QRCodeLoginStatus
-  message?: string
-  userInfo?: UserLoginInfo
-}
-
-// WebSocket消息类型
-export const WSMessageType = {
-  QR_CREATE: 'qr_create',           // 创建二维码
-  QR_SCAN: 'qr_scan',               // 扫码通知
-  QR_CONFIRM: 'qr_confirm',         // 确认登录
-  QR_CANCEL: 'qr_cancel',           // 取消登录
-  QR_EXPIRE: 'qr_expire',           // 二维码过期
-  LOGIN_SUCCESS: 'login_success',   // 登录成功
-  LOGIN_FAILED: 'login_failed'      // 登录失败
-} as const
-
-export type WSMessageType = typeof WSMessageType[keyof typeof WSMessageType]
-
-// WebSocket消息
-export interface WSMessage {
-  type: WSMessageType
-  qrcodeId?: string
-  userInfo?: UserLoginInfo
-  timestamp: number
-  data?: any
 }
 
 // ============ 用户名密码登录相关类型 ============
@@ -118,7 +68,6 @@ export interface AvailabilityResponse {
 // 登录方式
 export const LoginMethod = {
   USERNAME: 'username',     // 用户名密码登录
-  QRCODE: 'qrcode',        // 扫码登录
   WECHAT: 'wechat'         // 微信小程序登录
 } as const
 

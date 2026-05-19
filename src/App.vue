@@ -175,21 +175,27 @@
                 <span class="dropdown-emoji">📝</span>
                 <span>外部记忆导入</span>
               </button>
+              <div class="dropdown-divider"></div>
+              <div class="dropdown-section-label">自动播放</div>
               <button
                 class="dropdown-item"
-                @click="playRandomMotion(); showMoreMenu = false"
-                title="随机动作"
+                :class="{ 'active': autoPlayMotion }"
+                @click="toggleAutoPlayMotion(!autoPlayMotion)"
+                title="自动播放动作"
               >
-                <span class="dropdown-emoji">🎭</span>
-                <span>随机动作</span>
+                <span class="dropdown-emoji">🎬</span>
+                <span>自动播放动作</span>
+                <span class="toggle-indicator">{{ autoPlayMotion ? '✓' : '' }}</span>
               </button>
               <button
                 class="dropdown-item"
-                @click="changeExpression(); showMoreMenu = false"
-                title="随机表情"
+                :class="{ 'active': autoPlayExpression }"
+                @click="toggleAutoPlayExpression(!autoPlayExpression)"
+                title="自动播放表情"
               >
-                <span class="dropdown-emoji">😊</span>
-                <span>随机表情</span>
+                <span class="dropdown-emoji">😄</span>
+                <span>自动播放表情</span>
+                <span class="toggle-indicator">{{ autoPlayExpression ? '✓' : '' }}</span>
               </button>
               <div class="dropdown-divider"></div>
               <button
@@ -255,6 +261,7 @@ import { getDisplayConfig } from './config/display'
 import type { UserLoginInfo, UserInfo } from './types/login'
 import type { Live2DAnimationCommand } from './types/live2d'
 import { authService } from './services/authService'
+import { setUnauthorizedHandler } from './services/httpClient'
 import { aiModelConfigService, aiModelSwitchService, type ModelConfig } from './services/aiModelConfig'
 
 import iconLogin from './images/zhanghudenglu-icon.png'
@@ -393,6 +400,46 @@ const showMoreMenu = ref(false)
 // 背景板显示状态
 const showBackground = ref(true)
 const isBackgroundHidden = ref(false)
+
+// 自动播放状态
+const autoPlayMotion = ref(false)
+const autoPlayExpression = ref(false)
+let autoMotionInterval: ReturnType<typeof setInterval> | null = null
+let autoExpressionInterval: ReturnType<typeof setInterval> | null = null
+
+// 启动/停止自动播放动作
+const toggleAutoPlayMotion = (enabled: boolean) => {
+  autoPlayMotion.value = enabled
+  if (autoMotionInterval) {
+    clearInterval(autoMotionInterval)
+    autoMotionInterval = null
+  }
+  if (enabled) {
+    autoMotionInterval = setInterval(() => {
+      playRandomMotion()
+    }, 5000)
+    console.log('✅ 自动播放动作已开启')
+  } else {
+    console.log('⏹️ 自动播放动作已关闭')
+  }
+}
+
+// 启动/停止自动播放表情
+const toggleAutoPlayExpression = (enabled: boolean) => {
+  autoPlayExpression.value = enabled
+  if (autoExpressionInterval) {
+    clearInterval(autoExpressionInterval)
+    autoExpressionInterval = null
+  }
+  if (enabled) {
+    autoExpressionInterval = setInterval(() => {
+      changeExpression()
+    }, 7000)
+    console.log('✅ 自动播放表情已开启')
+  } else {
+    console.log('⏹️ 自动播放表情已关闭')
+  }
+}
 
 // 鼠标穿透：状态缓存 + 启用防抖（禁用立即生效，启用延迟 250ms）
 let mousePenetrationListener: ((e: MouseEvent) => void) | null = null
@@ -696,6 +743,13 @@ const handleLogout = () => {
   console.log('已退出登录')
 }
 
+// 注册 401 未授权回调：token 失效时自动退出登录
+setUnauthorizedHandler(() => {
+  if (isLoggedIn.value) {
+    handleLogout()
+  }
+})
+
 /**
  * 加载 AI 模型列表
  */
@@ -909,6 +963,14 @@ onUnmounted(() => {
   if (mousePenetrationListener) {
     document.removeEventListener('mousemove', mousePenetrationListener)
     mousePenetrationListener = null
+  }
+  if (autoMotionInterval) {
+    clearInterval(autoMotionInterval)
+    autoMotionInterval = null
+  }
+  if (autoExpressionInterval) {
+    clearInterval(autoExpressionInterval)
+    autoExpressionInterval = null
   }
 })
 
@@ -1354,6 +1416,19 @@ const handleClickOutside = (e: MouseEvent) => {
 .dropdown-item:hover {
   background: rgba(255, 107, 157, 0.08);
   color: #C44569;
+}
+
+.dropdown-item.active {
+  background: rgba(255, 107, 157, 0.12);
+  color: #C44569;
+  font-weight: 500;
+}
+
+.toggle-indicator {
+  margin-left: auto;
+  font-size: 16px;
+  font-weight: bold;
+  color: #FF6B9D;
 }
 
 .dropdown-icon {

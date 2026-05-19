@@ -1,5 +1,5 @@
 import { getApiBaseUrl } from '../config'
-import { authService } from './authService'
+import { fetchWithAuth } from './httpClient'
 
 export interface VoiceModel {
   id?: number
@@ -34,30 +34,19 @@ class VoiceModelService {
     this.baseUrl = getApiBaseUrl()
   }
 
-  private getHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    }
-    const token = authService.getToken()
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`
-    }
-    return headers
-  }
-
-  private async fetchWithAuth(url: string, options?: RequestInit): Promise<Response> {
-    return fetch(url, {
+  private async request(url: string, options?: RequestInit): Promise<Response> {
+    return fetchWithAuth(url, {
       ...options,
       headers: {
-        ...this.getHeaders(),
-        ...options?.headers
-      }
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
     })
   }
 
   async getList(): Promise<VoiceModel[]> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/voice-model/list`)
+      const response = await this.request(`${this.baseUrl}/api/voice-model/list`)
       const result: ApiResponse<VoiceModel[]> = await response.json()
       if (result.code === 200) {
         return result.data || []
@@ -71,7 +60,7 @@ class VoiceModelService {
 
   async getListByType(modelType: 'tts' | 'asr'): Promise<VoiceModel[]> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/voice-model/list/${modelType}`)
+      const response = await this.request(`${this.baseUrl}/api/voice-model/list/${modelType}`)
       const result: ApiResponse<VoiceModel[]> = await response.json()
       if (result.code === 200) {
         return result.data || []
@@ -85,7 +74,7 @@ class VoiceModelService {
 
   async getDetail(id: number): Promise<VoiceModel | null> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/voice-model/detail/${id}`)
+      const response = await this.request(`${this.baseUrl}/api/voice-model/detail/${id}`)
       const result: ApiResponse<VoiceModel> = await response.json()
       if (result.code === 200) {
         return result.data
@@ -99,7 +88,7 @@ class VoiceModelService {
 
   async create(model: VoiceModel): Promise<VoiceModel | null> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/voice-model/create`, {
+      const response = await this.request(`${this.baseUrl}/api/voice-model/create`, {
         method: 'POST',
         body: JSON.stringify(model)
       })
@@ -117,7 +106,7 @@ class VoiceModelService {
 
   async update(id: number, model: Partial<VoiceModel>): Promise<boolean> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/voice-model/update/${id}`, {
+      const response = await this.request(`${this.baseUrl}/api/voice-model/update/${id}`, {
         method: 'PUT',
         body: JSON.stringify(model)
       })
@@ -131,7 +120,7 @@ class VoiceModelService {
 
   async delete(id: number): Promise<boolean> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/voice-model/delete/${id}`, { method: 'DELETE' })
+      const response = await this.request(`${this.baseUrl}/api/voice-model/delete/${id}`, { method: 'DELETE' })
       const result: ApiResponse<any> = await response.json()
       return result.code === 200
     } catch (error) {
@@ -142,7 +131,7 @@ class VoiceModelService {
 
   async setDefault(id: number): Promise<boolean> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/voice-model/set-default/${id}`, { method: 'POST' })
+      const response = await this.request(`${this.baseUrl}/api/voice-model/set-default/${id}`, { method: 'POST' })
       const result: ApiResponse<any> = await response.json()
       return result.code === 200
     } catch (error) {
@@ -155,7 +144,7 @@ class VoiceModelService {
     try {
       const queryText = text || '你好，这是一段测试语音。'
       const url = `${this.baseUrl}/api/voice-model/test-tts/${id}?text=${encodeURIComponent(queryText)}`
-      const response = await this.fetchWithAuth(url, { method: 'POST' })
+      const response = await this.request(url, { method: 'POST' })
       const result: ApiResponse<any> = await response.json()
       if (result.code === 200 && result.data?.success) {
         return {
@@ -173,7 +162,7 @@ class VoiceModelService {
 
   async testAsr(id: number): Promise<{ success: boolean } | null> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/voice-model/test-asr/${id}`, { method: 'POST' })
+      const response = await this.request(`${this.baseUrl}/api/voice-model/test-asr/${id}`, { method: 'POST' })
       const result: ApiResponse<any> = await response.json()
       if (result.code === 200 && result.data?.success) {
         return { success: true }
@@ -187,7 +176,7 @@ class VoiceModelService {
 
   async getUserTtsConfig(): Promise<VoiceModel | null> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/voice-model/user/tts`)
+      const response = await this.request(`${this.baseUrl}/api/voice-model/user/tts`)
       const result: ApiResponse<any> = await response.json()
       if (result.code === 200 && result.data?.hasCustomTts) {
         return result.data as VoiceModel
@@ -201,7 +190,7 @@ class VoiceModelService {
 
   async getUserAsrConfig(): Promise<VoiceModel | null> {
     try {
-      const response = await this.fetchWithAuth(`${this.baseUrl}/api/voice-model/user/asr`)
+      const response = await this.request(`${this.baseUrl}/api/voice-model/user/asr`)
       const result: ApiResponse<any> = await response.json()
       if (result.code === 200 && result.data?.hasCustomAsr) {
         return result.data as VoiceModel
