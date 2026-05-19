@@ -369,7 +369,7 @@ const loadModel = async () => {
     }
 
     if (model.internalModel.motionManager) {
-      await model.motion('idle', 0)
+      // 不再自动播放 idle 动作，由外部控制
     }
 
     adjustModelToContainer()
