@@ -399,3 +399,321 @@ CREATE TABLE live2d_models (
 5. **前端上传方式**：浏览器无法直接选择文件夹，两种方案：
    - 方案 A（简单）：让用户手动打包为 zip 后上传，`<input accept=".zip">`
    - 方案 B（体验好）：`<input webkitdirectory>` + 前端用 JSZip 打包后上传
+
+---
+
+## 9. 技术可行性评估
+
+### 9.1 核心结论：完全可行
+
+Live2D 模型的渲染 **100% 在浏览器本地完成**，后端只负责提供静态文件下载服务。`pixi-live2d-display` 的 `Live2DModel.from(url)` 原生支持 HTTP URL 加载，无需任何 hack。
+
+模型加载到浏览器 WebGL 内存后，所有动画、表情、物理模拟、眨眼、鼠标跟踪都是本地渲染，不需要与后端持续交互。
+
+### 9.2 加载与渲染生命周期
+
+```
+阶段一：模型初始化（需要网络请求）
+  Live2DModel.from("https://后端/model/chitose/chitose.model3.json")
+    ├─ [网络] fetch .model3.json        ← 入口文件
+    ├─ [网络] fetch .moc3               ← 骨架网格数据
+    ├─ [网络] fetch 所有纹理 .png        ← 贴图
+    ├─ [网络] fetch .physics3.json       ← 物理参数
+    ├─ [网络] fetch .pose3.json          ← 姿势参数
+    └─ [网络] 预加载 Idle 组 .motion3.json ← 待机动作
+
+  ⚡ 此阶段完成后，模型已在浏览器 WebGL 内存中
+  ⚡ .moc3 骨架 + 纹理 + 物理参数 = 完整的可渲染模型
+
+阶段二：运行动画（绝大部分在本地渲染）
+
+  已缓存的动作/表情：
+    model.motion('Tap', 0)     → 直接从内存读取，0ms 延迟
+    model.expression('Smile')  → 直接从内存读取，0ms 延迟
+    🟢 完全本地 WebGL 渲染，不需要任何网络请求
+
+  首次播放未缓存的动作/表情：
+    model.motion('Tap', 2)
+      → [网络] fetch Tap_02.motion3.json  ← 仅首次！
+      → 缓存到内存
+      → 本地 WebGL 渲染播放
+    🟡 仅首次需要网络请求，后续完全本地
+
+  动画帧渲染循环（每帧 60fps）：
+    眨眼 → 本地参数计算
+    呼吸 → 本地参数计算
+    物理模拟 → 本地计算
+    鼠标跟踪 → 本地计算
+    🟢 100% 本地渲染，0 网络请求
+```
+
+### 9.3 动作/表情的懒加载机制
+
+`pixi-live2d-display` 对动作和表情文件采用**按需加载 + 内存缓存**策略：
+
+| 资源类型 | 预加载策略 | 首次播放 | 后续播放 |
+|---------|-----------|---------|---------|
+| `.moc3` / 纹理 / 物理 | 初始化时全部加载 | 网络请求 | 内存缓存 |
+| Idle 组动作 | 默认预加载 | 可能已缓存 | 内存缓存 |
+| 其他组动作 | 不预加载 | **网络请求** | 内存缓存 |
+| 表情文件 | 不预加载 | **网络请求** | 内存缓存 |
+
+**关键：不需要每次更改动作都访问后端。** 动作/表情文件只在首次使用时下载一次，之后从内存缓存读取。
+
+---
+
+## 10. 补充建议
+
+### 10.1 前端：启用动作全量预加载
+
+当前代码使用默认的 `motionPreload` 策略（仅预加载 Idle 组），模型后端化后首次播放非 Idle 动作会有网络延迟。建议改为全量预加载：
+
+```typescript
+// 当前代码
+model = await Live2DModel.from(props.modelPath, { autoInteract: false })
+
+// 建议改为
+model = await Live2DModel.from(props.modelPath, {
+  autoInteract: false,
+  motionPreload: "ALL"  // 预加载所有动作，避免首次播放延迟
+})
+```
+
+`motionPreload` 支持三个值：
+- `"IDLE"`（默认）：只预加载 Idle 组
+- `"ALL"`：预加载所有组的动作
+- `"NONE"`：不预加载任何动作
+
+### 10.2 前端：添加模型加载进度指示
+
+模型后端化后，首次加载时间会变长（10-50MB 文件通过网络下载）。建议添加加载进度 UI：
+
+```typescript
+// 监听加载进度事件
+model.on('load', () => {
+  // 模型核心文件加载完成
+})
+
+model.on('textureLoaded', () => {
+  // 纹理加载完成
+})
+
+// 也可以通过 Live2DLoader 自定义加载行为
+import { Live2DLoader } from 'pixi-live2d-display'
+
+// 全局拦截加载请求，统计进度
+const originalLoad = Live2DLoader.load
+let loadedCount = 0
+let totalCount = 0
+
+Live2DLoader.load = function(url, ...args) {
+  totalCount++
+  return originalLoad.call(this, url, ...args).then(result => {
+    loadedCount++
+    const progress = Math.round((loadedCount / totalCount) * 100)
+    // 更新进度 UI：progress %
+    return result
+  })
+}
+```
+
+### 10.3 路径平铺策略修正
+
+原方案第 8.1 节要求"将所有文件平铺到 `{modelId}/` 下，保证 `.model3.json` 就在模型目录根层级"。**建议改为保持原始目录结构**，原因：
+
+`pixi-live2d-display` 基于 `.model3.json` 的 URL 解析所有相对路径。只要目录结构完整，路径自然正确。强制平铺反而容易破坏 `.model3.json` 中 `FileReferences` 的相对路径引用。
+
+**推荐策略：**
+
+1. 解压 zip 后，找到 `.model3.json` 文件所在的目录
+2. 将该目录（含完整子目录结构）作为模型目录复制到 `{MODEL_STORAGE_PATH}/{modelId}/`
+3. 确保 `.model3.json` 的 URL 能正确访问到所有引用文件
+
+```
+示例：用户上传 zip 解压后结构为
+  my_model/runtime/my_model.model3.json
+  my_model/runtime/my_model.moc3
+  my_model/runtime/my_model.1024/texture_00.png
+  my_model/runtime/expressions/Smile.exp3.json
+  my_model/runtime/motion/idle_01.motion3.json
+
+后端存储为：
+  {MODEL_STORAGE_PATH}/my_model/my_model.model3.json
+  {MODEL_STORAGE_PATH}/my_model/my_model.moc3
+  {MODEL_STORAGE_PATH}/my_model/my_model.1024/texture_00.png
+  {MODEL_STORAGE_PATH}/my_model/expressions/Smile.exp3.json
+  {MODEL_STORAGE_PATH}/my_model/motion/idle_01.motion3.json
+
+即：以 .model3.json 所在目录为根，去掉外层包裹目录
+```
+
+**后端处理伪代码更新：**
+
+```
+function processModelZip(zipPath, modelId):
+    tempDir = unzip(zipPath)
+
+    // 1. 找到 .model3.json 文件
+    modelFiles = glob(tempDir, "**/*.model3.json")
+    if modelFiles is empty → 拒绝："未找到 .model3.json 入口文件"
+
+    entryFile = modelFiles[0]
+    modelDir = dirname(entryFile)  // .model3.json 所在目录
+
+    // 2. 校验模型完整性（同第 4 节）
+    validateModel(modelDir)
+
+    // 3. 将 modelDir 整个目录（保持结构）复制到目标位置
+    targetDir = join(MODEL_STORAGE_PATH, modelId)
+    if exists(targetDir) → 删除旧目录
+    copyDirectory(modelDir, targetDir)
+
+    // 4. 生成 modelUrl
+    // model3.json 现在直接在 modelId/ 根下
+    modelUrl = BASE_URL + "/model/" + modelId + "/" + basename(entryFile)
+
+    // 5. 写入数据库
+    saveToDatabase(modelId, name, modelUrl)
+
+    return { id: modelId, modelUrl: modelUrl }
+```
+
+### 10.4 后端：模型文件缓存策略
+
+模型文件是静态资源，应设置长缓存以减少重复下载：
+
+```nginx
+# .moc3 和纹理文件：长缓存（内容不变）
+location ~* /model/.*\.(moc3|png|jpg|jpeg|webp)$ {
+    alias /data/live2d-models/;
+    add_header Access-Control-Allow-Origin *;
+    add_header Cache-Control "public, max-age=31536000, immutable";
+}
+
+# .json 文件：中等缓存（可能更新）
+location ~* /model/.*\.json$ {
+    alias /data/live2d-models/;
+    add_header Access-Control-Allow-Origin *;
+    add_header Cache-Control "public, max-age=3600";
+}
+```
+
+### 10.5 后端：模型上传增加预览图提取
+
+在模型上传 API 的后端处理中，自动提取第一张纹理作为预览图，避免前端额外请求：
+
+```
+// 在 processModelZip 中增加：
+modelJson = parseJSON(readFile(entryFile))
+firstTexture = modelJson.FileReferences.Textures[0]
+previewUrl = BASE_URL + "/model/" + modelId + "/" + firstTexture
+
+// 写入数据库时包含 previewUrl
+saveToDatabase(modelId, name, modelUrl, previewUrl)
+```
+
+### 10.6 前端：降级策略细化
+
+当后端 API 不可用时，应平滑降级到本地模型，不影响基本使用：
+
+```typescript
+const discoveredModels = computed(() => {
+  if (remoteModels.value.length > 0) {
+    return remoteModels.value.map(m => ({
+      id: m.id,
+      name: m.name,
+      path: m.modelUrl,
+      isValid: true
+    }))
+  }
+  // 降级到本地模型
+  const validIds = getValidAutoModelIds()
+  return validIds.map(id => ({
+    id,
+    name: autoModelConfig[id]?.name || id,
+    path: autoModelConfig[id]?.path || '',
+    isValid: autoModelConfig[id]?.exists || false
+  }))
+})
+```
+
+建议同时增加 API 健康检查，避免每次打开都等待超时：
+
+```typescript
+// 缓存 API 可用状态，5 分钟内不重试
+let apiAvailable: boolean | null = null
+let lastCheckTime = 0
+const CHECK_INTERVAL = 5 * 60 * 1000
+
+async function fetchRemoteModels(): Promise<Live2DModelInfo[]> {
+  const now = Date.now()
+  if (apiAvailable === false && now - lastCheckTime < CHECK_INTERVAL) {
+    return []
+  }
+  try {
+    const models = await live2dModelService.list()
+    apiAvailable = true
+    return models
+  } catch {
+    apiAvailable = false
+    lastCheckTime = now
+    console.warn('远程模型列表获取失败，使用本地模型')
+    return []
+  }
+}
+```
+
+### 10.7 前端：模型切换时的资源释放
+
+从后端加载模型后，切换模型时需要释放旧模型的 WebGL 资源，避免内存泄漏：
+
+```typescript
+// 切换模型前，销毁旧模型
+if (model) {
+  model.destroy({
+    children: true,
+    texture: true,    // 释放 WebGL 纹理
+    baseTexture: true // 释放基础纹理
+  })
+  model = null
+}
+```
+
+当前代码中 `loadModel()` 已有 `model?.destroy()` 调用，但建议确认 `destroy` 参数包含 `texture: true` 以确保 GPU 资源释放。
+
+### 10.8 模型上传 API 补充字段
+
+建议在模型上传响应中增加文件大小和文件数量信息，方便前端展示：
+
+```json
+{
+  "code": 200,
+  "msg": "上传成功",
+  "data": {
+    "id": "my_model",
+    "name": "My Model",
+    "modelUrl": "https://shiwu.shop/model/my_model/my_model.model3.json",
+    "previewImage": "https://shiwu.shop/model/my_model/my_model.1024/texture_00.png",
+    "fileSize": 15728640,
+    "fileCount": 12
+  }
+}
+```
+
+---
+
+## 11. 改造优先级建议
+
+| 优先级 | 改造项 | 原因 |
+|-------|--------|------|
+| P0 | 后端：模型列表 API + 静态文件服务 | 核心功能，前端才能切换到后端加载 |
+| P0 | 前端：`discoveredModels` 改为从 API 获取 | 对接后端模型列表 |
+| P0 | 前端：`motionPreload: "ALL"` | 避免后端化后首次动作播放延迟 |
+| P1 | 后端：模型上传 API | 支持运行时添加模型 |
+| P1 | 前端：加载进度指示 | 后端化后加载变慢，需要进度反馈 |
+| P1 | 前端：降级策略 | API 不可用时仍能使用本地模型 |
+| P2 | 后端：模型删除 API | 完整的模型管理闭环 |
+| P2 | 前端：模型管理 UI | 用户自助上传/删除模型 |
+| P2 | 前端：模型切换资源释放 | 防止内存泄漏 |
+| P3 | 后端：预览图自动提取 | 优化模型列表展示体验 |
+| P3 | Nginx 缓存策略优化 | 减少重复下载 |
