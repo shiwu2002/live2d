@@ -21,6 +21,10 @@ export type ControlCommand =
   | 'start_recognition'
   | 'interrupt'
   | 'pause_tts'
+  | 'favorability_changed' // 好感度变化
+
+// 消息子类型（用于区分主动推送的消息类型）
+export type MessageSubType = 'normal' | 'diary' | 'life_event' | 'miss_you' | 'proactive'
 
 // 基础消息接口
 export interface BaseMessage {
@@ -31,6 +35,8 @@ export interface BaseMessage {
   time?: string
   id?: string
   animation?: Live2DAnimationCommand
+  subType?: MessageSubType // 消息子类型，用于区分主动推送消息
+  isProactive?: boolean // 是否为主动推送消息（非用户触发的回复）
 }
 
 // 文本消息
@@ -75,6 +81,8 @@ export type ChatMessage = TextMessage | AudioMessage | ControlMessage | ErrorMes
 export type MessageCallback = (message: ChatMessage) => void
 export type ConnectionCallback = (connected: boolean) => void
 export type ErrorCallback = (error: Error) => void
+export type ProactiveMessageCallback = (message: ChatMessage) => void // 主动推送消息回调
+export type FavorabilityChangeCallback = (data: { favorability: number; delta: number; levelName: string }) => void // 好感度变化回调
 
 // WebSocket 配置
 export interface WebSocketConfig {
@@ -88,16 +96,26 @@ export class WebSocketService {
   private ws: WebSocket | null = null
   private config: WebSocketConfig
   private reconnectAttempts = 0
-  private maxReconnectAttempts = 5
+  private maxReconnectAttempts =  5
   private reconnectDelay = 3000
   private messageCallbacks: Set<MessageCallback> = new Set()
   private connectionCallbacks: Set<ConnectionCallback> = new Set()
   private errorCallbacks: Set<ErrorCallback> = new Set()
   private heartbeatInterval: number | null = null
   private isManualClose = false
+  private isWaitingForResponse = false // 是否正在等待AI回复
+  private proactiveMessageCallbacks: Set<ProactiveMessageCallback> = new Set() // 主动推送消息回调
+  private favorabilityChangeCallbacks: Set<FavorabilityChangeCallback> = new Set() // 好感度变化回调
 
   constructor(config: WebSocketConfig) {
     this.config = config
+  }
+
+  /**
+   * 设置等待响应状态
+   */
+  setWaitingForResponse(waiting: boolean): void {
+    this.isWaitingForResponse = waiting
   }
 
   /**
@@ -233,8 +251,22 @@ export class WebSocketService {
           if (parsed.type === 'PONG') {
             return
           }
+
+          // 处理控制消息中的好感度变化
+          if (parsed.type === 'CONTROL' && parsed.content === 'favorability_changed' && parsed.data) {
+            this.notifyFavorabilityChange(parsed.data)
+            return
+          }
           
           // 标准化消息格式
+          const isProactiveMsg = !this.isWaitingForResponse && parsed.sender === 'ai' && parsed.type === 'TEXT'
+          
+          // 判断消息子类型
+          let subType: MessageSubType = 'normal'
+          if (isProactiveMsg) {
+            subType = this.detectMessageSubType(parsed.content)
+          }
+          
           const message: ChatMessage = {
             type: parsed.type,
             content: parsed.content,
@@ -242,6 +274,8 @@ export class WebSocketService {
             timestamp: parsed.timestamp || Date.now(),
             id: parsed.id || this.generateId(),
             animation: parsed.animation || undefined,
+            subType: subType,
+            isProactive: isProactiveMsg
           }
           
           // 过滤掉后端回传的用户消息（sendText 已做本地回显，避免重复显示）
@@ -249,7 +283,13 @@ export class WebSocketService {
             return
           }
           
+          // 通知普通消息回调
           this.notifyMessage(message)
+          
+          // 如果是主动推送消息，额外通知主动推送回调
+          if (isProactiveMsg) {
+            this.notifyProactiveMessage(message)
+          }
         } catch (e) {
           // 如果不是 JSON，当作纯文本消息处理
           const message: TextMessage = {
@@ -269,6 +309,21 @@ export class WebSocketService {
   }
 
   /**
+   * 检测消息子类型（根据内容特征判断）
+   */
+  private detectMessageSubType(content: string): MessageSubType {
+    if (typeof content === 'string') {
+      // 日记消息：以 📖 开头
+      if (content.startsWith('📖')) {
+        return 'diary'
+      }
+      // 可以根据需要添加更多判断规则
+      // 例如生活事件可能包含特定关键词或时间标记
+    }
+    return 'proactive'
+  }
+
+  /**
    * 发送文本消息（支持纯文本或结构化消息）
    */
   sendText(content: string, asPlainText = false): boolean {
@@ -278,6 +333,9 @@ export class WebSocketService {
     }
 
     try {
+      // 设置等待响应状态
+      this.isWaitingForResponse = true
+      
       if (asPlainText) {
         // 直接发送纯文本
         this.ws!.send(content)
@@ -296,6 +354,11 @@ export class WebSocketService {
         // 本地回显
         this.notifyMessage(message)
       }
+      
+      // 3秒后自动重置等待状态（防止状态卡住）
+      setTimeout(() => {
+        this.isWaitingForResponse = false
+      }, 3000)
       
       return true
     } catch (error) {
@@ -494,5 +557,47 @@ export class WebSocketService {
   onError(callback: ErrorCallback): () => void {
     this.errorCallbacks.add(callback)
     return () => this.errorCallbacks.delete(callback)
+  }
+
+  /**
+   * 通知主动推送消息回调
+   */
+  private notifyProactiveMessage(message: ChatMessage): void {
+    this.proactiveMessageCallbacks.forEach(callback => {
+      try {
+        callback(message)
+      } catch (error) {
+        console.error('主动推送消息回调执行失败:', error)
+      }
+    })
+  }
+
+  /**
+   * 通知好感度变化回调
+   */
+  private notifyFavorabilityChange(data: any): void {
+    this.favorabilityChangeCallbacks.forEach(callback => {
+      try {
+        callback(data)
+      } catch (error) {
+        console.error('好感度变化回调执行失败:', error)
+      }
+    })
+  }
+
+  /**
+   * 订阅主动推送消息
+   */
+  onProactiveMessage(callback: ProactiveMessageCallback): () => void {
+    this.proactiveMessageCallbacks.add(callback)
+    return () => this.proactiveMessageCallbacks.delete(callback)
+  }
+
+  /**
+   * 订阅好感度变化
+   */
+  onFavorabilityChange(callback: FavorabilityChangeCallback): () => void {
+    this.favorabilityChangeCallbacks.add(callback)
+    return () => this.favorabilityChangeCallbacks.delete(callback)
   }
 }

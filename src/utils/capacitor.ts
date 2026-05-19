@@ -28,7 +28,7 @@ export async function initCapacitor(): Promise<void> {
 
   await SplashScreen.hide()
 
-  App.addListener('backButton', ({ canGoBack }) => {
+  App.addListener('backButton', ({ canGoBack }: { canGoBack: boolean }) => {
     if (!canGoBack) {
       App.exitApp()
     } else {

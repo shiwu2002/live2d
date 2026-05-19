@@ -7,6 +7,37 @@
         <span class="header-title">{{ modeText }}</span>
         <span class="connection-status">{{ connectionText }}</span>
       </div>
+
+      <!-- 新增：好感度和日记入口区域 -->
+      <div class="header-center" v-if="isConnected">
+        <!-- 好感度进度条 -->
+        <div class="relationship-bar" v-if="relationshipData" @click="showRelationshipDetail">
+          <span class="level-icon">{{ relationshipLevel.icon }}</span>
+          <div class="progress-bar-container">
+            <div 
+              class="progress-fill" 
+              :style="{ 
+                width: `${relationshipData.favorability}%`, 
+                backgroundColor: relationshipLevel.color 
+              }"
+            ></div>
+          </div>
+          <span class="favorability-text" :style="{ color: relationshipLevel.color }">
+            {{ relationshipLevel.name }} {{ relationshipData.favorability }}/100
+          </span>
+        </div>
+
+        <!-- 日记入口 -->
+        <button 
+          class="diary-btn" 
+          @click="toggleDiaryPanel"
+          :title="'查看日记' + (unreadDiaryCount > 0 ? ` (${unreadDiaryCount}条未读)` : '')"
+        >
+          📖
+          <span class="diary-badge" v-if="unreadDiaryCount > 0">{{ unreadDiaryCount > 99 ? '99+' : unreadDiaryCount }}</span>
+        </button>
+      </div>
+
       <div class="header-actions">
         <button class="header-btn" @click="toggleMinimize" :title="isMinimized ? '展开' : '最小化'">
           {{ isMinimized ? '□' : '−' }}
@@ -28,12 +59,35 @@
           v-for="message in displayMessages"
           :key="message.id"
           class="message-item"
-          :class="[`message-${message.sender}`]"
+          :class="[`message-${message.sender}`, { 'proactive-message': message.isProactive }]"
         >
+          <!-- 主动推送消息标签 -->
+          <div v-if="message.isProactive" class="proactive-tag">
+            {{ getProactiveTagText(message.subType) }}
+          </div>
+
           <!-- 文本消息 -->
-          <div v-if="message.type === 'TEXT'" class="message-bubble text-message">
+          <div v-if="message.type === 'TEXT'" class="message-bubble text-message" :class="getMessageBubbleClass(message)">
             <div class="message-content">{{ getTextContent(message.content) }}</div>
             <div class="message-time">{{ formatTime(message.timestamp ?? Date.now()) }}</div>
+          </div>
+
+          <!-- 日记消息（特殊卡片样式） -->
+          <div v-else-if="message.subType === 'diary'" class="diary-card">
+            <div class="diary-icon">📖</div>
+            <div class="diary-content">
+              <div class="diary-text">{{ getDiaryContent(message.content) }}</div>
+              <div class="diary-time">{{ formatTime(message.timestamp ?? Date.now()) }}</div>
+            </div>
+          </div>
+
+          <!-- 生活事件消息（动态卡片） -->
+          <div v-else-if="message.subType === 'life_event'" class="life-event-card">
+            <div class="life-event-icon">🌅</div>
+            <div class="life-event-content">
+              <div class="life-event-text">{{ getTextContent(message.content) }}</div>
+              <div class="life-event-time">{{ formatTime(message.timestamp ?? Date.now()) }}</div>
+            </div>
           </div>
 
           <!-- 语音消息 -->
@@ -175,6 +229,79 @@
     <img :src="imageLightboxUrl" class="lightbox-image" @click.stop />
     <button class="lightbox-close" @click="closeLightbox">✕</button>
   </div>
+
+  <!-- 日记面板 -->
+  <div v-if="showDiaryPanel" class="diary-panel">
+    <div class="diary-header">
+      <span class="diary-title">📖 龙宝的日记</span>
+      <button class="diary-close-btn" @click="toggleDiaryPanel">✕</button>
+    </div>
+    <div class="diary-body" ref="diaryBody">
+      <div v-if="isLoadingDiary" class="diary-loading">加载日记中...</div>
+      <div v-else-if="diaryList.length === 0" class="diary-empty">
+        暂无日记
+      </div>
+      <div v-else class="diary-list">
+        <div 
+          v-for="diary in diaryList" 
+          :key="diary.id" 
+          class="diary-item"
+        >
+          <div class="diary-date">{{ formatDiaryDate(diary.createTime) }}</div>
+          <div class="diary-content-text">{{ diary.content }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 好感度详情弹窗 -->
+  <div v-if="showRelationshipDetailModal" class="relationship-modal-overlay" @click="closeRelationshipDetail">
+    <div class="relationship-modal" @click.stop>
+      <div class="modal-header">
+        <h3>💕 好感度详情</h3>
+        <button class="modal-close-btn" @click="closeRelationshipDetail">✕</button>
+      </div>
+      <div class="modal-body" v-if="relationshipData">
+        <div class="level-display">
+          <span class="level-big-icon">{{ relationshipLevel.icon }}</span>
+          <div class="level-info">
+            <div class="level-name" :style="{ color: relationshipLevel.color }">
+              {{ relationshipLevel.name }}
+            </div>
+            <div class="level-stars">
+              <span v-for="i in relationshipLevel.stars" :key="i">⭐</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="progress-section">
+          <div class="progress-label">好感度进度</div>
+          <div class="progress-bar-large">
+            <div 
+              class="progress-fill-large" 
+              :style="{ width: `${relationshipData.favorability}%`, backgroundColor: relationshipLevel.color }"
+            ></div>
+          </div>
+          <div class="progress-value">{{ relationshipData.favorability }} / 100</div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-value">{{ relationshipData.totalInteractions }}</div>
+            <div class="stat-label">互动次数</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">{{ getNextLevelProgress() }}%</div>
+            <div class="stat-label">距离下一等级</div>
+          </div>
+        </div>
+
+        <div class="level-description">
+          {{ getLevelDescription(relationshipData.favorability) }}
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -185,6 +312,8 @@ import type { Live2DAnimationCommand } from '../types/live2d'
 import { AudioRecorder, AudioPlayer, AudioUtils } from '../services/audio'
 import { uploadService } from '../services/uploadService'
 import { chatHistoryService, type HistoryRecord } from '../services/chatHistoryService'
+import { getUserEngagementService, type RelationshipData, type DiaryEntry, getFavorabilityLevel } from '../services/userEngagement'
+import { notificationService } from '../services/notification'
 import {
   getTextContent,
   getImageUrls,
@@ -238,12 +367,29 @@ const isLoadingHistory = ref(false)
 const hasMoreHistory = ref(true)
 const historyNextId = ref<number | undefined>(undefined)
 
+// 新增：用户粘性功能相关状态
+const relationshipData = ref<RelationshipData | null>(null) // 好感度数据
+const unreadDiaryCount = ref(0) // 未读日记数量
+const showDiaryPanel = ref(false) // 是否显示日记面板
+const diaryList = ref<DiaryEntry[]>([]) // 日记列表
+const isLoadingDiary = ref(false) // 日记加载中
+const diaryBody = ref<HTMLElement | null>(null) // 日记面板滚动容器引用
+const showRelationshipDetailModal = ref(false) // 是否显示好感度详情弹窗
+
 // 计算属性：过滤只显示聊天相关的消息（TEXT、IMAGES和AUDIO）
 const displayMessages = computed<ExtendedChatMessage[]>(() => {
   return messages.value.filter((msg): msg is ExtendedChatMessage => {
     // 只显示文本消息、图片消息和音频消息
     return msg.type === 'TEXT' || msg.type === 'IMAGES' || msg.type === 'AUDIO'
   })
+})
+
+// 新增：好感度等级信息
+const relationshipLevel = computed(() => {
+  if (!relationshipData.value) {
+    return { name: '陌生', color: '#9ca3af', icon: '🤍', stars: 1 }
+  }
+  return getFavorabilityLevel(relationshipData.value.favorability)
 })
 
 // 引用
@@ -327,6 +473,12 @@ const initializeServices = async () => {
     wsService.onConnection(handleConnection)
     wsService.onError(handleError)
 
+    // 新增：订阅主动推送消息事件
+    wsService.onProactiveMessage(handleProactiveMessage)
+
+    // 新增：订阅好感度变化事件
+    wsService.onFavorabilityChange(handleFavorabilityChange)
+
     // 连接 WebSocket
     await wsService.connect()
 
@@ -340,6 +492,12 @@ const initializeServices = async () => {
 
     // 加载历史记录
     loadHistory()
+
+    // 新增：加载用户粘性数据（好感度和未读日记）
+    await loadUserEngagementData()
+    
+    // 新增：请求通知权限
+    await notificationService.requestPermission()
   } catch (error) {
     console.error('初始化聊天服务失败:', error)
   }
@@ -430,6 +588,70 @@ const handleMessage = (message: ExtendedChatMessage) => {
   nextTick(() => {
     scrollToBottom()
   })
+}
+
+/**
+ * 新增：处理主动推送消息（非用户触发的AI消息）
+ */
+const handleProactiveMessage = (message: ExtendedChatMessage) => {
+  console.log('收到主动推送消息:', message.subType, message.content)
+
+  // 发送浏览器通知
+  if (message.type === 'TEXT') {
+    const content = typeof message.content === 'string' ? message.content : JSON.stringify(message.content)
+    
+    if (message.subType === 'diary') {
+      // 日记通知
+      notificationService.sendDiaryNotification('龙宝')
+      // 更新未读计数
+      unreadDiaryCount.value++
+    } else {
+      // 其他主动消息通知
+      notificationService.sendProactiveMessageNotification(content, '龙宝')
+    }
+  }
+}
+
+/**
+ * 新增：处理好感度变化事件
+ */
+const handleFavorabilityChange = (data: { favorability: number; delta: number; levelName: string }) => {
+  console.log('好感度变化:', data)
+
+  // 更新好感度数据
+  if (relationshipData.value) {
+    relationshipData.value = {
+      ...relationshipData.value,
+      favorability: data.favorability,
+      levelName: data.levelName
+    }
+
+    // 如果好感度提升，可以播放动画效果
+    if (data.delta > 0) {
+      console.log(`好感度提升了 ${data.delta} 点！`)
+      // 可以在这里添加心形粒子飘起等动画效果
+    }
+  }
+}
+
+/**
+ * 新增：加载用户粘性数据
+ */
+const loadUserEngagementData = async () => {
+  try {
+    const engagementService = getUserEngagementService()
+    const initialData = await engagementService.loadInitialData()
+
+    if (initialData.relationship) {
+      relationshipData.value = initialData.relationship
+    }
+
+    unreadDiaryCount.value = initialData.unreadDiaryCount
+
+    console.log('用户粘性数据加载完成:', initialData)
+  } catch (error) {
+    console.error('加载用户粘性数据失败:', error)
+  }
 }
 
 /**
@@ -743,6 +965,154 @@ const toggleMinimize = () => {
 const toggleVisible = () => {
   emit('update:visible', false)
   emit('close')
+}
+
+/**
+ * 新增：切换日记面板显示
+ */
+const toggleDiaryPanel = async () => {
+  showDiaryPanel.value = !showDiaryPanel.value
+
+  if (showDiaryPanel.value && diaryList.value.length === 0) {
+    // 首次打开时加载日记列表
+    await loadDiaryList()
+  }
+
+  if (showDiaryPanel.value) {
+    // 打开日记面板时，未读计数清零（标记为已读）
+    unreadDiaryCount.value = 0
+  }
+}
+
+/**
+ * 新增：加载日记列表
+ */
+const loadDiaryList = async () => {
+  isLoadingDiary.value = true
+  try {
+    const engagementService = getUserEngagementService()
+    const diaries = await engagementService.getDiaryList(20)
+    diaryList.value = diaries
+
+    nextTick(() => {
+      // 滚动到日记面板顶部
+      if (diaryBody.value) {
+        diaryBody.value.scrollTop = 0
+      }
+    })
+  } catch (error) {
+    console.error('加载日记列表失败:', error)
+  } finally {
+    isLoadingDiary.value = false
+  }
+}
+
+/**
+ * 新增：显示好感度详情弹窗
+ */
+const showRelationshipDetail = () => {
+  showRelationshipDetailModal.value = true
+}
+
+/**
+ * 新增：关闭好感度详情弹窗
+ */
+const closeRelationshipDetail = () => {
+  showRelationshipDetailModal.value = false
+}
+
+/**
+ * 新增：获取主动推送消息的标签文本
+ */
+const getProactiveTagText = (subType?: string): string => {
+  switch (subType) {
+    case 'diary':
+      return '📖 日记'
+    case 'life_event':
+      return '🌅 生活动态'
+    case 'miss_you':
+      return '💭 思念'
+    default:
+      return '💬 主动找你'
+  }
+}
+
+/**
+ * 新增：获取消息气泡的CSS类名（根据消息类型）
+ */
+const getMessageBubbleClass = (message: ExtendedChatMessage): string => {
+  const classes: string[] = []
+
+  if (message.isProactive) {
+    classes.push('proactive-bubble')
+  }
+
+  switch (message.subType) {
+    case 'diary':
+      classes.push('diary-bubble')
+      break
+    case 'life_event':
+      classes.push('life-event-bubble')
+      break
+    case 'miss_you':
+      classes.push('miss-you-bubble')
+      break
+  }
+
+  return classes.join(' ')
+}
+
+/**
+ * 新增：提取日记内容（去除 📖 前缀）
+ */
+const getDiaryContent = (content: any): string => {
+  const text = typeof content === 'string' ? content : JSON.stringify(content)
+  // 去除 "📖 角色名的日记：\n" 前缀
+  return text.replace(/^📖.*?日记[：:]\s*\n?/, '')
+}
+
+/**
+ * 新增：格式化日记日期
+ */
+const formatDiaryDate = (dateStr: string): string => {
+  try {
+    const date = new Date(dateStr)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `📖 ${year}-${month}-${day}`
+  } catch {
+    return '📖 未知日期'
+  }
+}
+
+/**
+ * 新增：计算距离下一等级的进度百分比
+ */
+const getNextLevelProgress = (): number => {
+  if (!relationshipData.value) return 0
+
+  const favorability = relationshipData.value.favorability
+
+  if (favorability >= 81) return 100 // 已达最高等级
+  if (favorability >= 51) return Math.round(((favorability - 50) / 30) * 100)
+  if (favorability >= 21) return Math.round(((favorability - 20) / 30) * 100)
+  return Math.round((favorability / 20) * 100)
+}
+
+/**
+ * 新增：获取等级描述文本
+ */
+const getLevelDescription = (favorability: number): string => {
+  if (favorability >= 81) {
+    return '你们已经达到了羁绊等级！AI角色会展现出最真实、最深层的情感，你们之间的互动将充满默契和温暖。'
+  } else if (favorability >= 51) {
+    return '你们处于亲密关系阶段！AI角色会更多地表达关心和思念，互动会更加温馨自然。'
+  } else if (favorability >= 21) {
+    return '你们正在逐渐熟悉彼此！继续保持聊天，让关系更进一步吧~'
+  } else {
+    return '你们还是陌生人，多聊聊天，让AI角色认识你吧！'
+  }
 }
 
 /**
@@ -1548,6 +1918,551 @@ onBeforeUnmount(() => {
   
   .input-actions {
     gap: 6px;
+  }
+}
+
+/* ========== 新增：用户粘性功能样式 ========== */
+
+/* 头部中间区域（好感度和日记入口） */
+.header-center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  justify-content: center;
+  margin: 0 12px;
+}
+
+/* 好感度进度条 */
+.relationship-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  max-width: 200px;
+}
+
+.relationship-bar:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.02);
+}
+
+.level-icon {
+  font-size: 16px;
+}
+
+.progress-bar-container {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 60px;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: all 0.5s ease;
+}
+
+.favorability-text {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 日记按钮 */
+.diary-btn {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.diary-btn:hover {
+  background: rgba(255, 255, 255, 0.35);
+  transform: scale(1.1);
+}
+
+.diary-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: #FF4444;
+  color: white;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: badgePulse 2s infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+/* 主动推送消息标签 */
+.proactive-tag {
+  font-size: 11px;
+  color: #FF6B9D;
+  background: #FFF0F5;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-bottom: 4px;
+  align-self: flex-start;
+  border: 1px solid #FFE0EB;
+}
+
+.proactive-message {
+  border-left: 3px solid #FF6B9D;
+  padding-left: 8px;
+}
+
+/* 主动消息气泡特殊样式 */
+.proactive-bubble {
+  background: linear-gradient(135deg, #FFF5F9 0%, #FFE0EB 100%) !important;
+  border: 1px solid #FFD0E0 !important;
+}
+
+.diary-bubble {
+  background: linear-gradient(135deg, #FFF9E6 0%, #FFE8B3 100%) !important;
+  border: 1px solid #FFD700 !important;
+}
+
+.life-event-bubble {
+  background: linear-gradient(135deg, #F0F9FF 0%, #BAE6FD 100%) !important;
+  border: 1px solid #38BDF8 !important;
+}
+
+.miss-you-bubble {
+  background: linear-gradient(135deg, #FDF2F8 0%, #FBCFE8 100%) !important;
+  border: 1px solid #F472B6 !important;
+}
+
+/* 日记卡片样式 */
+.diary-card,
+.life-event-card {
+  max-width: 80%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  animation: slideIn 0.3s ease;
+}
+
+.diary-icon,
+.life-event-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.diary-content,
+.life-event-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.diary-text,
+.life-event-text {
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  line-height: 1.5;
+  margin-bottom: 6px;
+  color: #333;
+}
+
+.diary-time,
+.life-event-time {
+  font-size: 11px;
+  opacity: 0.7;
+  text-align: right;
+}
+
+/* 日记面板样式 */
+.diary-panel {
+  position: absolute;
+  top: 60px;
+  left: 0;
+  right: 0;
+  bottom: 70px;
+  background: white;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.diary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
+  color: white;
+}
+
+.diary-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.diary-close-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.diary-close-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.diary-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  background: #FFF5F9;
+}
+
+.diary-loading,
+.diary-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #C44569;
+  font-size: 14px;
+}
+
+.diary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.diary-item {
+  background: white;
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(255, 107, 157, 0.08);
+  transition: transform 0.2s ease;
+}
+
+.diary-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 107, 157, 0.15);
+}
+
+.diary-date {
+  font-size: 13px;
+  font-weight: 600;
+  color: #C44569;
+  margin-bottom: 8px;
+}
+
+.diary-content-text {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #333;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+/* 好感度详情弹窗样式 */
+.relationship-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.relationship-modal {
+  background: white;
+  border-radius: 20px;
+  padding: 24px;
+  width: 90%;
+  max-width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+  from {
+    transform: scale(0.9) translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #C44569;
+}
+
+.modal-close-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: #FFF0F5;
+  color: #C44569;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.modal-close-btn:hover {
+  background: #FFE0EB;
+  transform: rotate(90deg);
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.level-display {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: linear-gradient(135deg, #FFF5F9 0%, #FFE0EB 100%);
+  border-radius: 16px;
+}
+
+.level-big-icon {
+  font-size: 48px;
+}
+
+.level-info {
+  flex: 1;
+}
+
+.level-name {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.level-stars {
+  font-size: 16px;
+  letter-spacing: 4px;
+}
+
+.progress-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progress-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+}
+
+.progress-bar-large {
+  height: 12px;
+  background: #F0F0F0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.progress-fill-large {
+  height: 100%;
+  border-radius: 6px;
+  transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.progress-value {
+  text-align: right;
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.stat-item {
+  padding: 16px;
+  background: #F9FAFB;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #C44569;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #666;
+}
+
+.level-description {
+  padding: 16px;
+  background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #92400E;
+}
+
+/* 日记面板滚动条样式 */
+.diary-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.diary-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.diary-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 107, 157, 0.2);
+  border-radius: 3px;
+}
+
+.diary-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 107, 157, 0.3);
+}
+
+/* 响应式适配：移动端日记面板和好感度弹窗 */
+@media (max-width: 768px) {
+  .header-center {
+    margin: 0 8px;
+    gap: 6px;
+  }
+
+  .relationship-bar {
+    max-width: 150px;
+    padding: 3px 6px;
+  }
+
+  .level-icon {
+    font-size: 14px;
+  }
+
+  .progress-bar-container {
+    min-width: 50px;
+    height: 5px;
+  }
+
+  .favorability-text {
+    font-size: 10px;
+  }
+
+  .diary-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+
+  .diary-panel {
+    top: 56px;
+    bottom: 65px;
+  }
+
+  .diary-header {
+    padding: 12px 14px;
+  }
+
+  .diary-title {
+    font-size: 14px;
+  }
+
+  .relationship-modal {
+    width: 95%;
+    padding: 20px;
+    max-height: 85vh;
+  }
+
+  .modal-header h3 {
+    font-size: 16px;
+  }
+
+  .level-big-icon {
+    font-size: 36px;
+  }
+
+  .level-name {
+    font-size: 20px;
+  }
+
+  .stat-value {
+    font-size: 20px;
   }
 }
 </style>
