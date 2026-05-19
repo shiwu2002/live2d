@@ -3,6 +3,8 @@
  * 管理所有服务的地址和配置
  */
 
+import { isNativeApp } from '../utils/capacitor'
+
 // ==================== 类型定义 ====================
 
 // 环境类型
@@ -123,7 +125,9 @@ export const defaultAudioConfig: AudioConfig = {
  * 获取当前环境
  */
 function getCurrentEnvironment(): Environment {
-  // 优先使用环境变量
+  if (isNativeApp) {
+    return 'production'
+  }
   const viteEnv = import.meta.env.MODE
   
   if (viteEnv === 'production') {

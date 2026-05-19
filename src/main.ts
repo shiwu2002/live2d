@@ -1,5 +1,11 @@
 import { createApp } from 'vue'
 import './style.css'
 import App from './App.vue'
+import { initCapacitor } from './utils/capacitor'
 
-createApp(App).mount('#app')
+async function bootstrap() {
+  await initCapacitor()
+  createApp(App).mount('#app')
+}
+
+bootstrap()

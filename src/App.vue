@@ -1,5 +1,5 @@
 <template>
-  <div class="app-container desktop-pet">
+  <div class="app-container desktop-pet" :class="{ 'native-app': isMobileApp }">
     <ChatWindow
       v-if="showChat"
       :ws-url="wsConfig.baseUrl"
@@ -55,6 +55,12 @@
       :userId="currentUser?.openid || ''"
       @close="showVoiceModelSettings = false"
       @changed="handleVoiceModelsChanged"
+    />
+
+    <Live2DModelManager
+      :visible="showLive2DModelManager"
+      @close="showLive2DModelManager = false"
+      @changed="handleLive2DModelsChanged"
     />
 
     <div v-if="discoveredModels.length > 0" class="pet-container desktop-pet">
@@ -168,6 +174,14 @@
               </button>
               <button
                 class="dropdown-item"
+                @click="toggleLive2DModelManager(); showMoreMenu = false"
+                title="Live2D 模型管理"
+              >
+                <span class="dropdown-emoji">🎭</span>
+                <span>Live2D 模型管理</span>
+              </button>
+              <button
+                class="dropdown-item"
                 @click="toggleMemoryUpload(); showMoreMenu = false"
                 :style="!isLoggedIn ? 'opacity:0.4' : ''"
                 title="对话记忆"
@@ -254,7 +268,9 @@ import CharacterSettings from './components/CharacterSettings.vue'
 import CustomModelManager from './components/CustomModelManager.vue'
 import MemoryUpload from './components/MemoryUpload.vue'
 import VoiceModelSettings from './components/VoiceModelSettings.vue'
+import Live2DModelManager from './components/Live2DModelManager.vue'
 import { autoModelConfig, getValidAutoModelIds } from './config/auto-models'
+import { live2dModelService, type Live2DModelInfo } from './services/live2dModelService'
 import { getChatConfig, generateSessionId } from './config'
 import { getWebSocketUrl, logEnvConfig } from './config'
 import { getDisplayConfig } from './config/display'
@@ -263,6 +279,7 @@ import type { Live2DAnimationCommand } from './types/live2d'
 import { authService } from './services/authService'
 import { setUnauthorizedHandler } from './services/httpClient'
 import { aiModelConfigService, aiModelSwitchService, type ModelConfig } from './services/aiModelConfig'
+import { isNativeApp } from './utils/capacitor'
 
 import iconLogin from './images/zhanghudenglu-icon.png'
 import iconChat from './images/liaotian.png'
@@ -271,6 +288,7 @@ import iconCharacter from './images/jiaoseguanlijiaoseshezhi.png'
 import iconMore from './images/gengduo.png'
 
 const isDesktop = ref(!!(window as any).electronAPI?.isElectron)
+const isMobileApp = ref(isNativeApp)
 
 const handleDragStart = (e: MouseEvent) => {
   console.log('handleDragStart called')
@@ -309,16 +327,23 @@ interface ModelInfo {
 
 const live2dModelRef = ref<InstanceType<typeof Live2DModel> | null>(null)
 
-// 从自动生成的配置中获取模型列表（只包含有效模型）
-const discoveredModels = computed<ModelInfo[]>(() => {
-  // 使用新的验证函数，只返回文件存在的模型
-  const validModelIds = getValidAutoModelIds()
+const remoteModels = ref<Live2DModelInfo[]>([])
 
+const discoveredModels = computed<ModelInfo[]>(() => {
+  if (remoteModels.value.length > 0) {
+    return remoteModels.value.map(m => ({
+      id: m.id,
+      name: m.name,
+      path: m.modelUrl,
+      isValid: true
+    }))
+  }
+  const validModelIds = getValidAutoModelIds()
   return validModelIds.map(id => {
     const config = autoModelConfig[id]
     return {
       id,
-      name: id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      name: config?.name || id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
       path: config?.path ?? '',
       isValid: config?.exists ?? false
     }
@@ -339,17 +364,17 @@ const modelLoadError = ref<string>('')
 
 // 验证并设置默认模型（选择第一个有效模型）
 const initializeDefaultModel = () => {
-  const validIds = getValidAutoModelIds()
+  const models = discoveredModels.value
+  const validModels = models.filter(m => m.isValid)
 
-  if (validIds.length > 0) {
-    // 如果当前模型无效或为空，设置为第一个有效模型
-    if (!currentModel.value || !validIds.includes(currentModel.value)) {
-      currentModel.value = validIds[0] ?? ''
-      console.log(`✅ 已加载 ${validIds.length} 个有效模型，默认: ${validIds[0]}`)
+  if (validModels.length > 0) {
+    if (!currentModel.value || !validModels.find(m => m.id === currentModel.value)) {
+      currentModel.value = validModels[0]!.id
+      console.log(`✅ 已加载 ${validModels.length} 个有效模型，默认: ${validModels[0]!.id}`)
     }
   } else {
     console.warn('⚠️  未找到有效的 Live2D 模型')
-    modelLoadError.value = '未找到可用的模型文件，请运行 npm run scan-models'
+    modelLoadError.value = '未找到可用的模型文件'
   }
 }
 
@@ -393,6 +418,9 @@ const showMemoryUpload = ref(false)
 
 // 语音模型设置窗口状态
 const showVoiceModelSettings = ref(false)
+
+// Live2D 模型管理窗口状态
+const showLive2DModelManager = ref(false)
 
 // 更多菜单下拉状态
 const showMoreMenu = ref(false)
@@ -457,6 +485,7 @@ const hasActiveInteractiveUI = () => {
     showCustomModelManager.value ||
     showMemoryUpload.value ||
     showVoiceModelSettings.value ||
+    showLive2DModelManager.value ||
     showMoreMenu.value
   )
 }
@@ -556,7 +585,7 @@ const onMainWindowFocused = () => {
 
 // 监听交互界面状态变化
 watch(
-  [showChat, showVoiceCall, showUserAuthModal, showCharacterSettings, showCustomModelManager, showMemoryUpload, showMoreMenu],
+  [showChat, showVoiceCall, showUserAuthModal, showCharacterSettings, showCustomModelManager, showMemoryUpload, showVoiceModelSettings, showLive2DModelManager, showMoreMenu],
   () => {
     if (!isDesktop.value) return
     const hasUI = hasActiveInteractiveUI()
@@ -675,6 +704,17 @@ const toggleMemoryUpload = () => {
 const toggleVoiceModelSettings = () => {
   if (!requireAuth()) return
   showVoiceModelSettings.value = !showVoiceModelSettings.value
+}
+
+// 切换 Live2D 模型管理窗口
+const toggleLive2DModelManager = () => {
+  showLive2DModelManager.value = !showLive2DModelManager.value
+}
+
+// Live2D 模型变更回调
+const handleLive2DModelsChanged = async () => {
+  remoteModels.value = await live2dModelService.list()
+  initializeDefaultModel()
 }
 
 // 自定义模型变更回调
@@ -908,6 +948,16 @@ onMounted(async () => {
   widgetPosY.value = Math.max(0, h - Math.min(h - 20, height) - 20)
 
   console.log('onMounted desktop check, isDesktop:', isDesktop.value)
+
+  try {
+    const models = await live2dModelService.list()
+    if (models.length > 0) {
+      remoteModels.value = models
+      initializeDefaultModel()
+    }
+  } catch {
+    console.warn('远程模型列表获取失败，使用本地模型')
+  }
 
   if (isDesktop.value) {
     try {
@@ -1616,5 +1666,14 @@ const handleClickOutside = (e: MouseEvent) => {
   .user-info-panel {
     display: none;
   }
+}
+
+.app-container.native-app {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.app-container.native-app .pet-toolbar.desktop-pet {
+  bottom: calc(26px + env(safe-area-inset-bottom));
 }
 </style>

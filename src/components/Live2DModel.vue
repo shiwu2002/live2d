@@ -310,13 +310,14 @@ const loadModel = async () => {
   if (!app) return
 
   try {
-    const { Live2DModel } = await import('pixi-live2d-display/cubism4')
+    const { Live2DModel, MotionPreloadStrategy } = await import('pixi-live2d-display/cubism4')
     if (!tickerRegistered) {
       Live2DModel.registerTicker(Ticker)
       tickerRegistered = true
     }
     model = await Live2DModel.from(props.modelPath, {
-      autoInteract: false
+      autoInteract: false,
+      motionPreload: MotionPreloadStrategy.ALL
     })
 
     app.stage.addChild(model)
@@ -714,7 +715,12 @@ watch(() => props.modelPath, async () => {
     backgroundDrawableIndices = []
     backgroundMeshes.length = 0
     app.stage.removeChild(model)
-    model.destroy()
+    model.destroy({
+      children: true,
+      texture: true,
+      baseTexture: true
+    })
+    model = null
     await loadModel()
   }
 })
