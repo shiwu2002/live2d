@@ -96,14 +96,29 @@ export class AuthService {
       const response = await fetch(`${this.baseUrl}/auth/login`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json'
         },
         body: formData.toString()
+      })
+
+      console.log('[AuthService] 登录请求:', {
+        url: `${this.baseUrl}/auth/login`,
+        status: response.status,
+        statusText: response.statusText
       })
   
       // 先检查响应状态
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        // 尝试读取错误响应体
+        let errorBody = ''
+        try {
+          errorBody = await response.text()
+        } catch (e) {
+          errorBody = '(无法读取响应体)'
+        }
+        console.error('[AuthService] 登录失败响应:', { status: response.status, body: errorBody })
+        throw new Error(`HTTP ${response.status}: ${response.statusText}${errorBody ? ` | ${errorBody}` : ''}`)
       }
   
       // 尝试解析 JSON

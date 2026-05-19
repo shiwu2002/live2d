@@ -175,6 +175,7 @@
               <button
                 class="dropdown-item"
                 @click="toggleLive2DModelManager(); showMoreMenu = false"
+                :style="!isLoggedIn ? 'opacity:0.4' : ''"
                 title="Live2D 模型管理"
               >
                 <span class="dropdown-emoji">🎭</span>
@@ -708,6 +709,7 @@ const toggleVoiceModelSettings = () => {
 
 // 切换 Live2D 模型管理窗口
 const toggleLive2DModelManager = () => {
+  if (!requireAuth()) return
   showLive2DModelManager.value = !showLive2DModelManager.value
 }
 

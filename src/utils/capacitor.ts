@@ -1,14 +1,28 @@
-import { Capacitor } from '@capacitor/core'
-import { StatusBar, Style } from '@capacitor/status-bar'
-import { SplashScreen } from '@capacitor/splash-screen'
-import { App } from '@capacitor/app'
+let Capacitor: any
+let StatusBar: any
+let SplashScreen: any
+let App: any
 
-export const isNativeApp = Capacitor.isNativePlatform()
-export const platform = Capacitor.getPlatform()
+try {
+  const core = await import('@capacitor/core')
+  Capacitor = core.Capacitor
+  const statusBar = await import('@capacitor/status-bar')
+  StatusBar = statusBar.StatusBar
+  const splashScreen = await import('@capacitor/splash-screen')
+  SplashScreen = splashScreen.SplashScreen
+  const app = await import('@capacitor/app')
+  App = app.App
+} catch {
+  console.warn('[Capacitor] Native modules not available, running in web/electron mode')
+}
+
+export const isNativeApp = Capacitor?.isNativePlatform() ?? false
+export const platform = Capacitor?.getPlatform() ?? 'web'
 
 export async function initCapacitor(): Promise<void> {
-  if (!isNativeApp) return
+  if (!isNativeApp || !Capacitor) return
 
+  const { Style } = await import('@capacitor/status-bar')
   await StatusBar.setStyle({ style: Style.Light })
   await StatusBar.setBackgroundColor({ color: '#FFDEE9' })
 

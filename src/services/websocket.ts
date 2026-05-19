@@ -28,6 +28,7 @@ export interface BaseMessage {
   content: any
   sender?: 'user' | 'system' | 'ai'
   timestamp?: number
+  time?: string
   id?: string
   animation?: Live2DAnimationCommand
 }
@@ -287,6 +288,7 @@ export class WebSocketService {
           content,
           sender: 'user',
           timestamp: Date.now(),
+          time: new Date().toISOString(),
           id: this.generateId()
         }
         this.ws!.send(JSON.stringify(message))
@@ -341,7 +343,9 @@ export class WebSocketService {
       const message = {
         type: 'CONTROL',
         content: command,  // 直接使用command字符串作为content
-        sender: 'user'
+        sender: 'user',
+        timestamp: Date.now(),
+        time: new Date().toISOString()
       }
       
       this.ws!.send(JSON.stringify(message))
@@ -369,6 +373,7 @@ export class WebSocketService {
         content: imageUrls,
         sender: 'user',
         timestamp: Date.now(),
+        time: new Date().toISOString(),
         id: this.generateId()
       }
       

@@ -24,6 +24,7 @@
     "dependencies": {
         "@capacitor/android": "^8.3.4",
         "@capacitor/app": "^8.1.0",
+        "@capacitor/core": "^8.3.4",
         "@capacitor/ios": "^8.3.4",
         "@capacitor/splash-screen": "^8.0.1",
         "@capacitor/status-bar": "^8.0.2",
@@ -39,7 +40,6 @@
     },
     "devDependencies": {
         "@capacitor/cli": "^8.3.4",
-        "@capacitor/core": "^8.3.4",
         "@types/node": "^24.10.1",
         "@vitejs/plugin-vue": "^6.0.1",
         "@vue/tsconfig": "^0.8.1",
