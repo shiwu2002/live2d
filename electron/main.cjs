@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen } = require('electron')
+const { app, BrowserWindow, ipcMain, screen, session } = require('electron')
 const path = require('path')
 
 let mainWindow
@@ -68,7 +68,8 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      webSecurity: false
     }
   })
 
@@ -94,7 +95,18 @@ function createWindow() {
   })
 }
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ['https://shiwu.shop/*', 'wss://shiwu.shop/*'] },
+    (details, callback) => {
+      details.requestHeaders['Origin'] = 'https://shiwu.shop'
+      details.requestHeaders['Referer'] = 'https://shiwu.shop/'
+      callback({ requestHeaders: details.requestHeaders })
+    }
+  )
+
+  createWindow()
+})
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

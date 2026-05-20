@@ -333,7 +333,7 @@ import Live2DModelManager from './components/Live2DModelManager.vue'
 import { autoModelConfig, getValidAutoModelIds } from './config/auto-models'
 import { live2dModelService, type Live2DModelInfo } from './services/live2dModelService'
 import { getChatConfig, generateSessionId, getEnvConfig } from './config'
-import { getWebSocketUrl, logEnvConfig } from './config'
+import { getWebSocketUrl } from './config'
 import { getDisplayConfig } from './config/display'
 import type { UserLoginInfo, UserInfo } from './types/login'
 import type { Live2DAnimationCommand } from './types/live2d'
@@ -487,12 +487,6 @@ const initializeDefaultModel = (preferredModelId?: string) => {
     modelLoadError.value = '未找到可用的模型文件'
   }
 }
-
-// 获取当前模型显示名称
-const currentModelName = computed(() => {
-  const model = discoveredModels.value.find(m => m.id === currentModel.value)
-  return model ? model.name : '加载中...'
-})
 
 // 小窗口配置 - 固定尺寸，适合 Live2D 模型显示比例
 const displayCfg = getDisplayConfig()
