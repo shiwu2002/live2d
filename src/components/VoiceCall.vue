@@ -52,6 +52,7 @@ const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
   (e: 'close'): void
   (e: 'animation', command: Live2DAnimationCommand): void
+  (e: 'auth-failed'): void
 }>()
 
 const callState = ref<CallState>('idle')
@@ -107,6 +108,11 @@ const initVoiceCallManager = () => {
     setTimeout(() => {
       errorMessage.value = ''
     }, 5000)
+  })
+
+  voiceCallManager.value.onAuthFailed(() => {
+    console.warn('[WS-Auth] 语音 WebSocket 认证失败，通知父组件')
+    emit('auth-failed')
   })
 
   voiceCallManager.value.onRecognition((text) => {

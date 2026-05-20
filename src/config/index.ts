@@ -125,7 +125,7 @@ export const defaultAudioConfig: AudioConfig = {
  * 获取当前环境
  */
 function getCurrentEnvironment(): Environment {
-  if (isNativeApp) {
+  if (isNativeApp()) {
     return 'production'
   }
   const viteEnv = import.meta.env.MODE

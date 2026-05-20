@@ -8,36 +8,6 @@
         <span class="connection-status">{{ connectionText }}</span>
       </div>
 
-      <!-- 新增：好感度和日记入口区域 -->
-      <div class="header-center" v-if="isConnected">
-        <!-- 好感度进度条 -->
-        <div class="relationship-bar" v-if="relationshipData" @click="showRelationshipDetail">
-          <span class="level-icon">{{ relationshipLevel.icon }}</span>
-          <div class="progress-bar-container">
-            <div 
-              class="progress-fill" 
-              :style="{ 
-                width: `${relationshipData.favorability}%`, 
-                backgroundColor: relationshipLevel.color 
-              }"
-            ></div>
-          </div>
-          <span class="favorability-text" :style="{ color: relationshipLevel.color }">
-            {{ relationshipLevel.name }} {{ relationshipData.favorability }}/100
-          </span>
-        </div>
-
-        <!-- 日记入口 -->
-        <button 
-          class="diary-btn" 
-          @click="toggleDiaryPanel"
-          :title="'查看日记' + (unreadDiaryCount > 0 ? ` (${unreadDiaryCount}条未读)` : '')"
-        >
-          📖
-          <span class="diary-badge" v-if="unreadDiaryCount > 0">{{ unreadDiaryCount > 99 ? '99+' : unreadDiaryCount }}</span>
-        </button>
-      </div>
-
       <div class="header-actions">
         <button class="header-btn" @click="toggleMinimize" :title="isMinimized ? '展开' : '最小化'">
           {{ isMinimized ? '□' : '−' }}
@@ -340,6 +310,7 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'update:visible', value: boolean): void
   (e: 'animation', command: Live2DAnimationCommand): void
+  (e: 'auth-failed'): void
 }>()
 
 // WebSocket 和音频服务
@@ -478,6 +449,9 @@ const initializeServices = async () => {
 
     // 新增：订阅好感度变化事件
     wsService.onFavorabilityChange(handleFavorabilityChange)
+
+    // 新增：订阅认证失败事件（Token 过期）
+    wsService.onAuthFailed(handleAuthFailed)
 
     // 连接 WebSocket
     await wsService.connect()
@@ -680,6 +654,14 @@ const handleConnection = (connected: boolean) => {
  */
 const handleError = (error: Error) => {
   console.error('聊天错误:', error)
+}
+
+/**
+ * 处理认证失败（Token 过期/无效）
+ */
+const handleAuthFailed = () => {
+  console.warn('[WS-Auth] 聊天 WebSocket 认证失败，通知父组件')
+  emit('auth-failed')
 }
 
 /**
@@ -1192,8 +1174,16 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  // 统一清理资源
   cleanupConnection()
+})
+
+defineExpose({
+  relationshipData,
+  relationshipLevel,
+  unreadDiaryCount,
+  toggleDiaryPanel,
+  showRelationshipDetail,
+  closeRelationshipDetail
 })
 </script>
 
@@ -1921,104 +1911,7 @@ onBeforeUnmount(() => {
   }
 }
 
-/* ========== 新增：用户粘性功能样式 ========== */
-
-/* 头部中间区域（好感度和日记入口） */
-.header-center {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  justify-content: center;
-  margin: 0 12px;
-}
-
-/* 好感度进度条 */
-.relationship-bar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 20px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  max-width: 200px;
-}
-
-.relationship-bar:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(1.02);
-}
-
-.level-icon {
-  font-size: 16px;
-}
-
-.progress-bar-container {
-  flex: 1;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
-  overflow: hidden;
-  min-width: 60px;
-}
-
-.progress-fill {
-  height: 100%;
-  border-radius: 3px;
-  transition: all 0.5s ease;
-}
-
-.favorability-text {
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-/* 日记按钮 */
-.diary-btn {
-  position: relative;
-  width: 32px;
-  height: 32px;
-  border: none;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  cursor: pointer;
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.diary-btn:hover {
-  background: rgba(255, 255, 255, 0.35);
-  transform: scale(1.1);
-}
-
-.diary-badge {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  background: #FF4444;
-  color: white;
-  border-radius: 9px;
-  font-size: 11px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: badgePulse 2s infinite;
-}
-
-@keyframes badgePulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-}
+/* ========== 用户粘性功能样式 ========== */
 
 /* 主动推送消息标签 */
 .proactive-tag {

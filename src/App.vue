@@ -10,6 +10,8 @@
       @update:visible="showChat = $event"
       @close="showChat = false"
       @animation="handleAnimation"
+      @auth-failed="handleWsAuthFailed"
+      ref="chatWindowRef"
     />
 
     <VoiceCall
@@ -20,6 +22,7 @@
       :ai-session-id="wsConfig.aiSessionId"
       @close="showVoiceCall = false"
       @animation="handleAnimation"
+      @auth-failed="handleWsAuthFailed"
     />
 
     <UserAuthModal
@@ -79,6 +82,28 @@
           :width="widgetWidth"
           :height="widgetHeight"
         />
+
+        <!-- 竖状好感度条（模型右上方） -->
+        <div
+          class="relationship-bar-vertical desktop-pet"
+          @click="handleShowRelationshipDetail"
+          :title="chatRelationshipData ? `${chatRelationshipLevel.name} ${chatRelationshipData.favorability}/100` : '打开聊天后显示好感度'"
+        >
+          <div class="rv-icon">{{ chatRelationshipLevel.icon }}</div>
+          <div class="rv-track">
+            <div
+              class="rv-fill"
+              :style="{
+                height: `${chatRelationshipData?.favorability ?? 0}%`,
+                backgroundColor: chatRelationshipLevel.color
+              }"
+            ></div>
+            <div class="rv-glow" :style="{ backgroundColor: chatRelationshipLevel.color }"></div>
+          </div>
+          <div class="rv-label" :style="{ color: chatRelationshipLevel.color }">
+            {{ chatRelationshipData?.favorability ?? '-' }}
+          </div>
+        </div>
       </div>
 
       <div class="pet-toolbar desktop-pet">
@@ -144,6 +169,12 @@
                 </select>
               </div>
               <div class="dropdown-divider"></div>
+              <div class="dropdown-section-label">账户</div>
+              <div v-if="isLoggedIn && currentUser" class="dropdown-user-info">
+                <img v-if="currentUser.avatar" :src="currentUser.avatar" class="dropdown-avatar" alt="" />
+                <span class="dropdown-username">{{ currentUser.nickname || '微信用户' }}</span>
+                <span class="dropdown-user-id">{{ currentUser.openid.substring(0, 8) }}...</span>
+              </div>
               <div class="dropdown-section-label">操作</div>
               <button
                 class="dropdown-item"
@@ -190,7 +221,18 @@
                 <span class="dropdown-emoji">📝</span>
                 <span>外部记忆导入</span>
               </button>
+              <button
+                class="dropdown-item"
+                @click="handleToggleDiary(); showMoreMenu = false"
+                :style="!isChatConnected ? 'opacity:0.4' : ''"
+                title="查看日记"
+              >
+                <span class="dropdown-emoji">📖</span>
+                <span>日记</span>
+                <span v-if="chatUnreadDiaryCount > 0" class="diary-badge-inline">{{ chatUnreadDiaryCount > 99 ? '99+' : chatUnreadDiaryCount }}</span>
+              </button>
               <div class="dropdown-divider"></div>
+
               <div class="dropdown-section-label">自动播放</div>
               <button
                 class="dropdown-item"
@@ -231,21 +273,7 @@
               </button>
             </div>
           </div>
-
-          <div v-if="isLoggedIn && currentUser" class="mobile-user-name">
-            {{ currentUser.nickname || '微信用户' }}
-          </div>
         </div>
-      </div>
-    </div>
-
-    <div class="user-info-panel" v-if="isLoggedIn && currentUser">
-      <div class="user-avatar" v-if="currentUser.avatar">
-        <img :src="currentUser.avatar" :alt="currentUser.nickname" />
-      </div>
-      <div class="user-details">
-        <p class="user-nickname">{{ currentUser.nickname || '微信用户' }}</p>
-        <p class="user-id">ID: {{ currentUser.openid.substring(0, 8) }}...</p>
       </div>
     </div>
 
@@ -281,6 +309,7 @@ import { authService } from './services/authService'
 import { setUnauthorizedHandler } from './services/httpClient'
 import { aiModelConfigService, aiModelSwitchService, type ModelConfig } from './services/aiModelConfig'
 import { isNativeApp } from './utils/capacitor'
+import { type RelationshipData, getFavorabilityLevel } from './services/userEngagement'
 
 import iconLogin from './images/zhanghudenglu-icon.png'
 import iconChat from './images/liaotian.png'
@@ -289,7 +318,7 @@ import iconCharacter from './images/jiaoseguanlijiaoseshezhi.png'
 import iconMore from './images/gengduo.png'
 
 const isDesktop = ref(!!(window as any).electronAPI?.isElectron)
-const isMobileApp = ref(isNativeApp)
+const isMobileApp = ref(isNativeApp())
 
 const handleDragStart = (e: MouseEvent) => {
   console.log('handleDragStart called')
@@ -327,6 +356,7 @@ interface ModelInfo {
 }
 
 const live2dModelRef = ref<InstanceType<typeof Live2DModel> | null>(null)
+const chatWindowRef = ref<InstanceType<typeof ChatWindow> | null>(null)
 
 const remoteModels = ref<Live2DModelInfo[]>([])
 
@@ -719,6 +749,39 @@ const handleLive2DModelsChanged = async () => {
   initializeDefaultModel()
 }
 
+// 从 ChatWindow 获取好感度数据（竖状条用）
+const chatRelationshipData = computed<RelationshipData | null>(() => {
+  const raw = chatWindowRef.value?.relationshipData
+  if (!raw) return null
+  return 'value' in raw ? (raw as any).value : raw as RelationshipData
+})
+
+const chatRelationshipLevel = computed(() => {
+  if (!chatRelationshipData.value) {
+    return { name: '陌生', color: '#9ca3af', icon: '🤍', stars: 1 }
+  }
+  return getFavorabilityLevel(chatRelationshipData.value.favorability)
+})
+
+const handleShowRelationshipDetail = () => {
+  chatWindowRef.value?.showRelationshipDetail()
+}
+
+const isChatConnected = computed(() => {
+  return !!chatWindowRef.value
+})
+
+const chatUnreadDiaryCount = computed(() => {
+  const raw = (chatWindowRef.value as any)?.unreadDiaryCount
+  if (!raw) return 0
+  if (typeof raw === 'number') return raw
+  return raw?.value ?? 0
+})
+
+const handleToggleDiary = () => {
+  chatWindowRef.value?.toggleDiaryPanel()
+}
+
 // 自定义模型变更回调
 const handleCustomModelsChanged = () => {
   loadAiModels()
@@ -727,6 +790,19 @@ const handleCustomModelsChanged = () => {
 // 语音模型变更回调
 const handleVoiceModelsChanged = () => {
   console.log('语音模型配置已更新')
+}
+
+/**
+ * 处理 WebSocket 认证失败（Token 过期/无效）
+ */
+const handleWsAuthFailed = () => {
+  console.warn('[App] WebSocket 认证失败，Token 已过期或无效，需要重新登录')
+
+  if (isLoggedIn.value) {
+    handleLogout()
+  }
+
+  showUserAuthModal.value = true
 }
 
 
@@ -1498,69 +1574,6 @@ const handleClickOutside = (e: MouseEvent) => {
   text-align: center;
 }
 
-.mobile-user-name {
-  display: none;
-}
-
-.user-info-panel {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  background: rgba(255, 255, 255, 0.98);
-  border-radius: 20px;
-  box-shadow: 0 12px 48px rgba(255, 107, 157, 0.2);
-  backdrop-filter: blur(10px);
-  padding: 16px 20px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  z-index: 998;
-  border: 2px solid rgba(255, 107, 157, 0.15);
-  transition: all 0.3s ease;
-}
-
-.user-info-panel:hover {
-  box-shadow: 0 16px 64px rgba(255, 107, 157, 0.3);
-}
-
-.user-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  overflow: hidden;
-  background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.user-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.user-details {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.user-nickname {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #C44569;
-}
-
-.user-id {
-  margin: 0;
-  font-size: 12px;
-  color: #FF8A9E;
-  font-family: 'Courier New', monospace;
-}
-
 .global-toast {
   position: fixed;
   top: 20px;
@@ -1648,24 +1661,7 @@ const handleClickOutside = (e: MouseEvent) => {
     height: 22px;
   }
 
-  .mobile-user-name {
-    display: block;
-    flex: 1 1 auto;
-    min-width: 0;
-    padding: 10px 12px;
-    background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
-    color: white;
-    border-radius: 12px;
-    font-size: 14px;
-    font-weight: 500;
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    box-shadow: 0 4px 12px rgba(255, 107, 157, 0.3);
-  }
-
-  .user-info-panel {
+  .relationship-bar-vertical {
     display: none;
   }
 }
@@ -1677,5 +1673,130 @@ const handleClickOutside = (e: MouseEvent) => {
 
 .app-container.native-app .pet-toolbar.desktop-pet {
   bottom: calc(26px + env(safe-area-inset-bottom));
+}
+
+/* 竖状好感度条（模型右上方） */
+.relationship-bar-vertical {
+  position: fixed;
+  right: calc(50% - 140px);
+  top: 12%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 7px 5px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(255,245,250,0.88) 100%);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 140, 170, 0.2);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow:
+    0 2px 12px rgba(255, 107, 157, 0.1),
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  z-index: 999;
+}
+.relationship-bar-vertical:hover {
+  transform: translateY(-2px) scale(1.06);
+  box-shadow:
+    0 8px 28px rgba(255, 107, 157, 0.2),
+    0 2px 8px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+.relationship-bar-vertical:active {
+  transform: scale(0.96);
+  transition-duration: 0.1s;
+}
+.rv-icon {
+  font-size: 16px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));
+}
+.rv-track {
+  width: 6px;
+  height: 80px;
+  background: linear-gradient(180deg, rgba(200,190,210,0.25) 0%, rgba(220,210,225,0.18) 100%);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.08);
+}
+.rv-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  border-radius: 10px;
+  transition: height 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.rv-glow {
+  position: absolute;
+  bottom: 0;
+  left: -2px;
+  width: calc(100% + 4px);
+  height: 20px;
+  border-radius: 10px;
+  opacity: 0.35;
+  filter: blur(4px);
+  transition: height 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s;
+  pointer-events: none;
+}
+.rv-label {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.2px;
+  text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+}
+
+/* 更多菜单中的日记徽章 */
+.diary-badge-inline {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: #FF4444;
+  color: white;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+}
+
+/* 更多菜单中的用户信息 */
+.dropdown-user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  margin-bottom: 2px;
+}
+.dropdown-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.dropdown-username {
+  font-size: 13px;
+  color: #e0e0e8;
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dropdown-user-id {
+  font-size: 11px;
+  color: #666;
+  flex-shrink: 0;
 }
 </style>

@@ -28,6 +28,7 @@ export class VoiceCallManager {
   private recognitionCallbacks: Set<(text: string) => void> = new Set()
   private aiReplyCallbacks: Set<(text: string, isFinal: boolean) => void> = new Set()
   private animationCallbacks: Set<(command: Live2DAnimationCommand) => void> = new Set()
+  private authFailedCallbacks: Set<() => void> = new Set()
   
   // 流式AI回复累积缓冲区
   private aiReplyBuffer = ''
@@ -108,6 +109,12 @@ export class VoiceCallManager {
     // 监听错误
     this.wsService.onError((error) => {
       this.handleError(error)
+    })
+
+    // 监听认证失败（Token 过期）
+    this.wsService.onAuthFailed(() => {
+      console.warn('[VoiceCall-Auth] Token 无效或已过期')
+      this.notifyAuthFailed()
     })
   }
 
@@ -445,6 +452,19 @@ export class VoiceCallManager {
   }
 
   /**
+   * 通知认证失败
+   */
+  private notifyAuthFailed(): void {
+    this.authFailedCallbacks.forEach(callback => {
+      try {
+        callback()
+      } catch (error) {
+        console.error('认证失败回调执行失败:', error)
+      }
+    })
+  }
+
+  /**
    * 订阅状态变化
    */
   onStateChange(callback: (state: VoiceCallState) => void): () => void {
@@ -480,6 +500,14 @@ export class VoiceCallManager {
   onAnimation(callback: (command: Live2DAnimationCommand) => void): () => void {
     this.animationCallbacks.add(callback)
     return () => this.animationCallbacks.delete(callback)
+  }
+
+  /**
+   * 订阅认证失败事件（Token 过期/无效）
+   */
+  onAuthFailed(callback: () => void): () => void {
+    this.authFailedCallbacks.add(callback)
+    return () => this.authFailedCallbacks.delete(callback)
   }
 
   /**

@@ -83,6 +83,7 @@ export type ConnectionCallback = (connected: boolean) => void
 export type ErrorCallback = (error: Error) => void
 export type ProactiveMessageCallback = (message: ChatMessage) => void // 主动推送消息回调
 export type FavorabilityChangeCallback = (data: { favorability: number; delta: number; levelName: string }) => void // 好感度变化回调
+export type AuthFailedCallback = () => void // 认证失败回调（Token 过期/无效）
 
 // WebSocket 配置
 export interface WebSocketConfig {
@@ -106,6 +107,11 @@ export class WebSocketService {
   private isWaitingForResponse = false // 是否正在等待AI回复
   private proactiveMessageCallbacks: Set<ProactiveMessageCallback> = new Set() // 主动推送消息回调
   private favorabilityChangeCallbacks: Set<FavorabilityChangeCallback> = new Set() // 好感度变化回调
+  private authFailedCallbacks: Set<AuthFailedCallback> = new Set() // 认证失败回调
+
+  // 认证失败相关的关闭码
+  private static readonly AUTH_CLOSE_CODES = [4001, 4002, 4003, 4004, 4005, 4006, 4007]
+  private static readonly AUTH_CLOSE_REASONS = ['token', 'auth', 'unauthorized', 'expired', 'invalid', 'forbidden']
 
   constructor(config: WebSocketConfig) {
     this.config = config
@@ -187,6 +193,13 @@ export class WebSocketService {
           console.log('WebSocket 连接关闭', event.code, event.reason)
           this.stopHeartbeat()
           this.notifyConnection(false)
+
+          // 检测是否为认证失败（Token 过期/无效）
+          if (this.isAuthFailure(event.code, event.reason)) {
+            console.warn('[WS-Auth] Token 无效或已过期，停止重连并触发认证失败回调')
+            this.notifyAuthFailed()
+            return
+          }
 
           if (!this.isManualClose && this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnect()
@@ -490,6 +503,30 @@ export class WebSocketService {
   }
 
   /**
+   * 检测关闭事件是否为认证失败
+   */
+  private isAuthFailure(code: number, reason: string): boolean {
+    if (WebSocketService.AUTH_CLOSE_CODES.includes(code)) {
+      return true
+    }
+    const lowerReason = reason.toLowerCase()
+    return WebSocketService.AUTH_CLOSE_REASONS.some(keyword => lowerReason.includes(keyword))
+  }
+
+  /**
+   * 通知认证失败回调
+   */
+  private notifyAuthFailed(): void {
+    this.authFailedCallbacks.forEach(callback => {
+      try {
+        callback()
+      } catch (error) {
+        console.error('认证失败回调执行失败:', error)
+      }
+    })
+  }
+
+  /**
    * 更新配置
    */
   updateConfig(config: Partial<WebSocketConfig>): void {
@@ -594,10 +631,19 @@ export class WebSocketService {
   }
 
   /**
-   * 订阅好感度变化
+   * 订阅好感度变化事件
    */
   onFavorabilityChange(callback: FavorabilityChangeCallback): () => void {
     this.favorabilityChangeCallbacks.add(callback)
     return () => this.favorabilityChangeCallbacks.delete(callback)
+  }
+
+  /**
+   * 订阅认证失败事件（Token 过期/无效）
+   * 当 WebSocket 因认证问题被拒绝连接时触发
+   */
+  onAuthFailed(callback: AuthFailedCallback): () => void {
+    this.authFailedCallbacks.add(callback)
+    return () => this.authFailedCallbacks.delete(callback)
   }
 }

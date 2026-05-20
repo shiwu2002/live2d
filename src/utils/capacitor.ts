@@ -1,47 +1,57 @@
-let Capacitor: any
-let StatusBar: any
-let SplashScreen: any
-let App: any
+let _isNativeApp = false
+let _platform = 'web'
 
-try {
-  const core = await import('@capacitor/core')
-  Capacitor = core.Capacitor
-  const statusBar = await import('@capacitor/status-bar')
-  StatusBar = statusBar.StatusBar
-  const splashScreen = await import('@capacitor/splash-screen')
-  SplashScreen = splashScreen.SplashScreen
-  const app = await import('@capacitor/app')
-  App = app.App
-} catch {
-  console.warn('[Capacitor] Native modules not available, running in web/electron mode')
+export const isNativeApp = () => _isNativeApp
+export const platform = () => _platform
+
+async function loadNativeModules() {
+  try {
+    const { Capacitor } = await import('@capacitor/core')
+    _isNativeApp = Capacitor.isNativePlatform()
+    _platform = Capacitor.getPlatform()
+    return { Capacitor }
+  } catch {
+    console.warn('[Capacitor] Native modules not available, running in web/electron mode')
+    return null
+  }
 }
 
-export const isNativeApp = Capacitor?.isNativePlatform() ?? false
-export const platform = Capacitor?.getPlatform() ?? 'web'
-
 export async function initCapacitor(): Promise<void> {
-  if (!isNativeApp || !Capacitor) return
+  await loadNativeModules()
 
-  const { Style } = await import('@capacitor/status-bar')
-  await StatusBar.setStyle({ style: Style.Light })
-  await StatusBar.setBackgroundColor({ color: '#FFDEE9' })
+  if (!_isNativeApp) return
 
-  await SplashScreen.hide()
+  try {
+    const { StatusBar, Style } = await import('@capacitor/status-bar')
+    await StatusBar.setStyle({ style: Style.Light })
+    await StatusBar.setBackgroundColor({ color: '#FFDEE9' })
+  } catch {
+  }
 
-  App.addListener('backButton', ({ canGoBack }: { canGoBack: boolean }) => {
-    if (!canGoBack) {
-      App.exitApp()
-    } else {
-      window.history.back()
-    }
-  })
+  try {
+    const { SplashScreen } = await import('@capacitor/splash-screen')
+    await SplashScreen.hide()
+  } catch {
+  }
 
-  if (platform === 'ios') {
+  try {
+    const { App: CapApp } = await import('@capacitor/app')
+    CapApp.addListener('backButton', ({ canGoBack }: { canGoBack: boolean }) => {
+      if (!canGoBack) {
+        CapApp.exitApp()
+      } else {
+        window.history.back()
+      }
+    })
+  } catch {
+  }
+
+  if (_platform === 'ios') {
     document.documentElement.style.setProperty('--safe-area-top', 'env(safe-area-inset-top)')
     document.documentElement.style.setProperty('--safe-area-bottom', 'env(safe-area-inset-bottom)')
   }
 
-  if (platform === 'android') {
+  if (_platform === 'android') {
     const meta = document.createElement('meta')
     meta.name = 'viewport'
     meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover'
@@ -53,11 +63,11 @@ export async function initCapacitor(): Promise<void> {
     }
   }
 
-  console.log(`[Capacitor] Initialized on ${platform}`)
+  console.log(`[Capacitor] Initialized on ${_platform}`)
 }
 
 export function getSafeAreaInsets(): { top: number; bottom: number; left: number; right: number } {
-  if (!isNativeApp) return { top: 0, bottom: 0, left: 0, right: 0 }
+  if (!_isNativeApp) return { top: 0, bottom: 0, left: 0, right: 0 }
 
   const style = getComputedStyle(document.documentElement)
   return {
