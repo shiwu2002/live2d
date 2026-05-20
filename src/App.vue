@@ -66,6 +66,36 @@
       @changed="handleLive2DModelsChanged"
     />
 
+    <!-- 独立日记面板（使用 Teleport 避免层级遮挡） -->
+    <Teleport to="body">
+      <div v-if="showDiaryPanel" class="diary-modal-overlay" @click="showDiaryPanel = false">
+        <div class="diary-modal" @click.stop>
+          <div class="diary-header">
+            <span class="diary-title">📖 龙宝的日记</span>
+            <button class="diary-close-btn" @click="showDiaryPanel = false">✕</button>
+          </div>
+          <div class="diary-body" ref="appDiaryBody">
+            <div v-if="isLoadingAppDiary" class="diary-loading">加载日记中...</div>
+            <div v-else-if="appDiaryList.length === 0" class="diary-empty">
+              <div class="empty-icon">📖</div>
+              <div class="empty-text">暂无日记</div>
+              <div class="empty-hint">龙宝还没有写日记哦~</div>
+            </div>
+            <div v-else class="diary-list">
+              <div
+                v-for="diary in appDiaryList"
+                :key="diary.id"
+                class="diary-item"
+              >
+                <div class="diary-date">{{ formatAppDiaryDate(diary.createTime) }}</div>
+                <div class="diary-content-text">{{ diary.content }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <div v-if="discoveredModels.length > 0" class="pet-container desktop-pet">
       <div class="background-board" :class="{ 'hidden': !showBackground }">
         <div class="drag-handle-top-right" @mousedown="handleDragStart" title="拖拽移动窗口">
@@ -224,7 +254,6 @@
               <button
                 class="dropdown-item"
                 @click="handleToggleDiary(); showMoreMenu = false"
-                :style="!isChatConnected ? 'opacity:0.4' : ''"
                 title="查看日记"
               >
                 <span class="dropdown-emoji">📖</span>
@@ -288,7 +317,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import Live2DModel from './components/Live2DModel.vue'
 import ChatWindow from './components/ChatWindow.vue'
 import VoiceCall from './components/VoiceCall.vue'
@@ -309,7 +338,7 @@ import { authService } from './services/authService'
 import { setUnauthorizedHandler } from './services/httpClient'
 import { aiModelConfigService, aiModelSwitchService, type ModelConfig } from './services/aiModelConfig'
 import { isNativeApp } from './utils/capacitor'
-import { getFavorabilityLevel } from './services/userEngagement'
+import { getUserEngagementService, getFavorabilityLevel } from './services/userEngagement'
 import { notificationWs, type NotificationRelationshipData } from './services/notificationWebSocket'
 
 import iconLogin from './images/zhanghudenglu-icon.png'
@@ -453,6 +482,12 @@ const showVoiceModelSettings = ref(false)
 
 // Live2D 模型管理窗口状态
 const showLive2DModelManager = ref(false)
+
+// 独立日记面板状态
+const showDiaryPanel = ref(false)
+const appDiaryList = ref<any[]>([])
+const isLoadingAppDiary = ref(false)
+const appDiaryBody = ref<HTMLElement | null>(null)
 
 // 更多菜单下拉状态
 const showMoreMenu = ref(false)
@@ -778,7 +813,42 @@ const chatUnreadDiaryCount = computed(() => {
 })
 
 const handleToggleDiary = () => {
-  chatWindowRef.value?.toggleDiaryPanel()
+  showDiaryPanel.value = !showDiaryPanel.value
+
+  if (showDiaryPanel.value && appDiaryList.value.length === 0) {
+    loadAppDiaryList()
+  }
+}
+
+const loadAppDiaryList = async () => {
+  isLoadingAppDiary.value = true
+  try {
+    const engagementService = getUserEngagementService()
+    const diaries = await engagementService.getDiaryList(20)
+    appDiaryList.value = diaries
+
+    nextTick(() => {
+      if (appDiaryBody.value) {
+        appDiaryBody.value.scrollTop = 0
+      }
+    })
+  } catch (error) {
+    console.error('加载日记列表失败:', error)
+  } finally {
+    isLoadingAppDiary.value = false
+  }
+}
+
+const formatAppDiaryDate = (dateStr: string): string => {
+  try {
+    const date = new Date(dateStr)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `📖 ${year}-${month}-${day}`
+  } catch {
+    return '📖 未知日期'
+  }
 }
 
 // 自定义模型变更回调
@@ -1787,6 +1857,170 @@ const handleClickOutside = (e: MouseEvent) => {
   align-items: center;
   justify-content: center;
   margin-left: auto;
+}
+
+/* 独立日记面板样式 */
+.diary-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.diary-modal {
+  background: white;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 450px;
+  height: 70vh;
+  max-height: 600px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+  from {
+    transform: scale(0.9) translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.diary-modal .diary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
+  color: white;
+  border-radius: 20px 20px 0 0;
+}
+
+.diary-modal .diary-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.diary-modal .diary-close-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.diary-modal .diary-close-btn:hover {
+  background: rgba(255, 255, 255, 0.35);
+  transform: rotate(90deg);
+}
+
+.diary-modal .diary-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  background: #FFF5F9;
+}
+
+.diary-modal .diary-loading,
+.diary-modal .diary-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #C44569;
+  font-size: 14px;
+}
+
+.diary-modal .diary-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.diary-modal .empty-icon {
+  font-size: 48px;
+}
+
+.diary-modal .empty-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #C44569;
+}
+
+.diary-modal .empty-hint {
+  font-size: 13px;
+  color: #999;
+}
+
+.diary-modal .diary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.diary-modal .diary-item {
+  background: white;
+  padding: 20px;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(255, 107, 157, 0.08);
+  transition: transform 0.2s ease;
+}
+
+.diary-modal .diary-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(255, 107, 157, 0.15);
+}
+
+.diary-modal .diary-date {
+  font-size: 14px;
+  font-weight: 600;
+  color: #C44569;
+  margin-bottom: 10px;
+}
+
+.diary-modal .diary-content-text {
+  font-size: 15px;
+  line-height: 1.7;
+  color: #333;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.diary-modal .diary-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.diary-modal .diary-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.diary-modal .diary-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 107, 157, 0.2);
+  border-radius: 3px;
+}
+
+.diary-modal .diary-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 107, 157, 0.3);
 }
 
 /* 更多菜单中的用户信息 */

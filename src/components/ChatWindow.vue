@@ -194,7 +194,7 @@
     <button class="lightbox-close" @click="closeLightbox">✕</button>
   </div>
 
-  <!-- 日记面板 -->
+  <!-- 日记面板（全屏覆盖） -->
   <div v-if="showDiaryPanel" class="diary-panel">
     <div class="diary-header">
       <span class="diary-title">📖 龙宝的日记</span>
@@ -203,12 +203,14 @@
     <div class="diary-body" ref="diaryBody">
       <div v-if="isLoadingDiary" class="diary-loading">加载日记中...</div>
       <div v-else-if="diaryList.length === 0" class="diary-empty">
-        暂无日记
+        <div class="empty-icon">📖</div>
+        <div class="empty-text">暂无日记</div>
+        <div class="empty-hint">龙宝还没有写日记哦~</div>
       </div>
       <div v-else class="diary-list">
-        <div 
-          v-for="diary in diaryList" 
-          :key="diary.id" 
+        <div
+          v-for="diary in diaryList"
+          :key="diary.id"
           class="diary-item"
         >
           <div class="diary-date">{{ formatDiaryDate(diary.createTime) }}</div>
@@ -1983,16 +1985,17 @@ defineExpose({
 /* 日记面板样式 */
 .diary-panel {
   position: absolute;
-  top: 60px;
+  top: 0;
   left: 0;
   right: 0;
-  bottom: 70px;
+  bottom: 0;
   background: white;
-  z-index: 100;
+  z-index: 9999;
   display: flex;
   flex-direction: column;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
   animation: slideUp 0.3s ease;
+  border-radius: 20px;
 }
 
 @keyframes slideUp {
@@ -2052,6 +2055,28 @@ defineExpose({
   padding: 40px 20px;
   color: #C44569;
   font-size: 14px;
+}
+
+.diary-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.diary-empty .empty-icon {
+  font-size: 48px;
+}
+
+.diary-empty .empty-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #C44569;
+}
+
+.diary-empty .empty-hint {
+  font-size: 13px;
+  color: #999;
 }
 
 .diary-list {
