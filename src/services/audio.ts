@@ -169,7 +169,6 @@ export class AudioRecorder {
     }
 
     this.audioChunks = []
-    console.log('音频录制器资源已释放')
   }
 
   /**
@@ -309,7 +308,6 @@ export class AudioPlayer {
       this.audioContext.close()
       this.audioContext = null
     }
-    console.log('音频播放器资源已释放')
   }
 
   /**

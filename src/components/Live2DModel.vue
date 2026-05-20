@@ -62,7 +62,6 @@ const collectAllSceneMeshes = () => {
     }
   }
   walk(model, 0, 'root')
-  console.log(`🔍 场景图中共找到 ${allSceneMeshes.length} 个 Mesh`)
 }
 
 const identifyBackgroundDrawables = () => {
@@ -81,15 +80,12 @@ const identifyBackgroundDrawables = () => {
       const sorted = [...allSceneMeshes].sort((a, b) => b.depth - a.depth)
       const candidates = sorted.slice(0, Math.max(1, Math.ceil(sorted.length * 0.3)))
       candidates.forEach(item => backgroundMeshes.push(item.mesh))
-      console.log('⚠️ 回退: 场景图深度推断背景, 候选数:', backgroundMeshes.length)
     }
     return
   }
 
   const renderOrders: number[] = Array.from(drawables.renderOrders as Float32Array)
-  console.log('📊 Drawables 总数:', renderOrders.length, '场景Mesh数:', allSceneMeshes.length)
 
-  // 获取纹理 URL 用于检测
   const textureUrls: string[] = []
   try {
     const settings = (model.internalModel as any).settings
@@ -97,7 +93,6 @@ const identifyBackgroundDrawables = () => {
       settings.textures.forEach((t: any) => textureUrls.push(String(t || '')))
     }
   } catch { /* ignore */ }
-  console.log('🖼️ 纹理 URL:', textureUrls)
 
   // 策略1: 纹理名匹配关键词
   const bgTextureSet = new Set<number>()
@@ -178,7 +173,6 @@ const identifyBackgroundDrawables = () => {
     renderOrders.forEach((order, index) => {
       if (order === minOrder) backgroundDrawableIndices.push(index)
     })
-    console.log('✅ 背景检测(renderOrder) - 索引:', backgroundDrawableIndices, '最小 order:', minOrder)
   }
 
   // 策略4: renderOrder 最低的 20%
@@ -186,7 +180,6 @@ const identifyBackgroundDrawables = () => {
     const sorted = renderOrders.map((order, idx) => ({ order, idx })).sort((a, b) => a.order - b.order)
     const cutoff = Math.max(1, Math.floor(renderOrders.length * 0.2))
     sorted.slice(0, cutoff).forEach(({ idx }) => backgroundDrawableIndices.push(idx))
-    console.log('⚠️ 背景检测(top 20%) - 索引:', backgroundDrawableIndices)
   }
 
   // 如果在场景图中找到了 backgroundMeshes，直接使用
@@ -226,12 +219,9 @@ const identifyBackgroundDrawables = () => {
       }
     })
   }
-
-  console.log('🎯 背景检测最终结果 - drawable索引:', backgroundDrawableIndices, 'mesh数量:', backgroundMeshes.length)
 }
 
 const applyHideBackground = (hide: boolean) => {
-  console.log('applyHideBackground:', hide, 'meshes:', backgroundMeshes.length, 'indices:', backgroundDrawableIndices)
 
   // 方法1: 直接隐藏已找到的 PIXI Mesh
   if (backgroundMeshes.length > 0) {
@@ -381,12 +371,6 @@ const loadModel = async () => {
     adjustModelToContainer()
 
     identifyBackgroundDrawables()
-
-    console.log('Live2D 模型加载成功', {
-      modelSize: { width: model.width, height: model.height },
-      scale: model.scale.x,
-      position: { x: model.x, y: model.y }
-    })
 
     emit('loaded')
   } catch (error) {
@@ -679,7 +663,6 @@ const waitForContainerReady = (): Promise<void> => {
       const height = Math.max(1, Math.floor(rect.height))
 
       if (width > 10 && height > 10) {
-        console.log(`✅ 容器就绪: ${width}x${height}`)
         resolve()
         return
       }

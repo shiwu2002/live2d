@@ -474,19 +474,14 @@ const initializeDefaultModel = (preferredModelId?: string) => {
     // 如果指定了首选模型ID，且该模型有效，则使用它
     if (preferredModelId && validModels.find(m => m.id === preferredModelId)) {
       currentModel.value = preferredModelId
-      console.log(`✅ 已加载 ${validModels.length} 个有效模型，使用指定模型: ${preferredModelId}`)
       return
     }
 
-    // 否则使用当前已选择的模型（如果仍有效）
     if (currentModel.value && validModels.find(m => m.id === currentModel.value)) {
-      console.log(`✅ 已加载 ${validModels.length} 个有效模型，保持当前: ${currentModel.value}`)
       return
     }
 
-    // 最后选择第一个有效模型
     currentModel.value = validModels[0]!.id
-    console.log(`✅ 已加载 ${validModels.length} 个有效模型，默认: ${validModels[0]!.id}`)
   } else {
     console.warn('⚠️  未找到有效的 Live2D 模型')
     modelLoadError.value = '未找到可用的模型文件'
@@ -758,9 +753,6 @@ const voiceWsUrl = getWebSocketUrl('voice')
 // 监听模型变化并输出日志
 watch(currentModel, (newModel, oldModel) => {
   if (newModel !== oldModel) {
-    console.log(`模型切换: ${oldModel} -> ${newModel}`)
-    console.log(`当前模型名称: ${currentModelName.value}`)
-    console.log(`当前模型路径: ${modelPath.value}`)
   }
 })
 
@@ -855,7 +847,6 @@ const handleLive2DModelsChanged = async () => {
 
 // Live2D 模型加载成功回调
 const handleLive2DModelLoaded = () => {
-  console.log('✅ [App] Live2D 模型加载成功')
   modelLoadError.value = ''
 }
 
@@ -1227,9 +1218,6 @@ checkLoginStatus()
 // 初始化：验证并设置默认有效模型
 initializeDefaultModel()
 
-// 输出环境配置信息（开发时便于调试）
-logEnvConfig()
-
 onMounted(async () => {
   updateIsMobile()
   window.addEventListener('resize', updateIsMobile)
@@ -1242,8 +1230,6 @@ onMounted(async () => {
   const height = displayCfg.widget.height + 56 + 56
   widgetPosX.value = Math.max(0, w - width - 20)
   widgetPosY.value = Math.max(0, h - Math.min(h - 20, height) - 20)
-
-  console.log('onMounted desktop check, isDesktop:', isDesktop.value)
 
   // 确保通知 WebSocket 在已登录状态下常驻连接
   if (isLoggedIn.value) {
@@ -1280,8 +1266,6 @@ onMounted(async () => {
   }
 
   ;(async () => {
-    console.log('=== STARTING TRANSPARENCY SETUP ===')
-
     const style = document.createElement('style')
     style.id = 'force-transparent-styles'
     style.textContent = `
@@ -1297,7 +1281,6 @@ onMounted(async () => {
         backdrop-filter: none !important;
       }
 
-      /* 确保所有可能的背景元素都透明 */
       .desktop-pet {
         background: transparent !important;
         background-color: transparent !important;
@@ -1306,9 +1289,6 @@ onMounted(async () => {
       }
     `
     document.head.appendChild(style)
-    console.log('✅ Injected force-transparent styles')
-    console.log('✅ Electron mode - transparency handled by BrowserWindow config')
-    console.log('=== TRANSPARENCY SETUP DONE ===')
   })()
 })
 

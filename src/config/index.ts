@@ -205,15 +205,6 @@ export function generateSessionId(): string {
  * 日志输出环境配置
  */
 export function logEnvConfig(): void {
-  const config = getEnvConfig()
-  console.log('========== 环境配置 ==========')
-  console.log('当前环境:', config.env)
-  console.log('API 基础地址:', config.apiBaseUrl)
-  console.log('WebSocket 基础地址:', config.wsBaseUrl)
-  console.log('WebSocket 端点:')
-  console.log('  - 聊天服务:', getWebSocketUrl('chat'))
-  console.log('  - 语音通话:', getWebSocketUrl('voice'))
-  console.log('============================')
 }
 
 // 导出当前环境配置（只读）
