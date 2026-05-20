@@ -24,6 +24,11 @@ const props = defineProps<{
   hideBackground?: boolean
 }>()
 
+const emit = defineEmits<{
+  loaded: []
+  error: [error: Error]
+}>()
+
 const canvasContainer = ref<HTMLDivElement>()
 let app: Application | null = null
 let model: Live2DModelType | null = null
@@ -382,8 +387,11 @@ const loadModel = async () => {
       scale: model.scale.x,
       position: { x: model.x, y: model.y }
     })
+
+    emit('loaded')
   } catch (error) {
     console.error('Live2D 模型加载失败:', error)
+    emit('error', error instanceof Error ? error : new Error(String(error)))
   }
 }
 
@@ -711,6 +719,13 @@ onUnmounted(() => {
 })
 
 watch(() => props.modelPath, async () => {
+  // 如果 modelPath 为空，不加载
+  if (!props.modelPath) {
+    console.log('[Live2D] modelPath 为空，跳过加载')
+    return
+  }
+
+  // 清理旧模型（如果存在）
   if (model && app) {
     backgroundDrawableIndices = []
     backgroundMeshes.length = 0
@@ -721,8 +736,25 @@ watch(() => props.modelPath, async () => {
       baseTexture: true
     })
     model = null
-    await loadModel()
   }
+
+  // 确保 PIXI app 已初始化并等待容器就绪
+  if (!app) {
+    initPixiApp()
+  }
+
+  // 等待容器和 app 都准备好
+  await waitForContainerReady()
+
+  // 再次检查 app 是否成功初始化
+  if (!app) {
+    console.error('[Live2D] PIXI app 初始化失败，无法加载模型')
+    emit('error', new Error('PIXI app 初始化失败'))
+    return
+  }
+
+  // 加载新模型
+  await loadModel()
 })
 </script>
 

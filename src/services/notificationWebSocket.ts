@@ -35,6 +35,7 @@ class NotificationWebSocketService {
   private handlers: Set<NotificationHandler> = new Set()
   private _token: string = ''
   private _isManualClose = false
+  private connectedHandlers: Set<() => void> = new Set()
 
   readonly relationship = ref<NotificationRelationshipData | null>(null)
   readonly isConnected = ref(false)
@@ -71,6 +72,7 @@ class NotificationWebSocketService {
       console.log('[NotificationWS] 已连接')
       this.isConnected.value = true
       this.startHeartbeat()
+      this.notifyConnected()
     }
 
     this.ws.onmessage = (event) => {
@@ -115,6 +117,11 @@ class NotificationWebSocketService {
   onMessage(handler: NotificationHandler): () => void {
     this.handlers.add(handler)
     return () => this.handlers.delete(handler)
+  }
+
+  onConnected(handler: () => void): () => void {
+    this.connectedHandlers.add(handler)
+    return () => this.connectedHandlers.delete(handler)
   }
 
   private handleMessage(msg: any): void {
@@ -178,6 +185,16 @@ class NotificationWebSocketService {
         h(msg)
       } catch (e) {
         console.error('[NotificationWS] handler 执行失败:', e)
+      }
+    })
+  }
+
+  private notifyConnected(): void {
+    this.connectedHandlers.forEach(h => {
+      try {
+        h()
+      } catch (e) {
+        console.error('[NotificationWS] connectedHandler 执行失败:', e)
       }
     })
   }

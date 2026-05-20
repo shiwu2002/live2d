@@ -121,23 +121,27 @@ export class UserEngagementService {
   async loadInitialData(): Promise<{
     relationship: RelationshipData | null
     unreadDiaryCount: number
+    recentDiaries: DiaryEntry[]
   }> {
     try {
       // 并行请求提高效率
-      const [relationship, unreadDiaryCount] = await Promise.allSettled([
+      const [relationship, unreadDiaryCount, recentDiaries] = await Promise.allSettled([
         this.getRelationship(),
-        this.getUnreadDiaryCount()
+        this.getUnreadDiaryCount(),
+        this.getDiaryList(10)  // 加载最近10条日记，用于补拉离线期间的日记
       ])
 
       return {
         relationship: relationship.status === 'fulfilled' ? relationship.value : null,
-        unreadDiaryCount: unreadDiaryCount.status === 'fulfilled' ? unreadDiaryCount.value : 0
+        unreadDiaryCount: unreadDiaryCount.status === 'fulfilled' ? unreadDiaryCount.value : 0,
+        recentDiaries: recentDiaries.status === 'fulfilled' ? recentDiaries.value : []
       }
     } catch (error) {
       console.error('加载初始数据失败:', error)
       return {
         relationship: null,
-        unreadDiaryCount: 0
+        unreadDiaryCount: 0,
+        recentDiaries: []
       }
     }
   }

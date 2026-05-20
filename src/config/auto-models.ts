@@ -1,6 +1,6 @@
 /**
  * Live2D 模型配置文件（自动生成）
- * 生成时间: 2026-05-19T03:07:22.624Z
+ * 生成时间: 2026-05-20T07:03:57.432Z
  * 基础路径: /live2d/
  * 
  * ⚠️ 警告：此文件由 scripts/scan-models.js 自动生成
@@ -15,36 +15,6 @@ export interface ModelConfig {
 }
 
 export const autoModelConfig: Record<string, ModelConfig> = {
-  chitose: {
-    name: 'Chitose',
-    path: 'model/chitose/runtime/chitose.model3.json',
-    description: '自动检测的模型',
-    exists: true
-  },
-  Epsilon: {
-    name: 'Epsilon',
-    path: 'model/Epsilon/runtime/Epsilon.model3.json',
-    description: '自动检测的模型',
-    exists: true
-  },
-  haru: {
-    name: 'Haru',
-    path: 'model/haru/runtime/haru.model3.json',
-    description: '自动检测的模型',
-    exists: true
-  },
-  haru_greeter_pro_jp: {
-    name: 'Haru Greeter T03',
-    path: 'model/haru_greeter_pro_jp/runtime/haru_greeter_t03.model3.json',
-    description: '自动检测的模型',
-    exists: true
-  },
-  hiyori_pro_zh: {
-    name: 'Hiyori Pro T10',
-    path: 'model/hiyori_pro_zh/runtime/hiyori_pro_t10.model3.json',
-    description: '自动检测的模型',
-    exists: true
-  },
   miku_pro_jp: {
     name: 'Miku Sample T04',
     path: 'model/miku_pro_jp/runtime/miku_sample_t04.model3.json',

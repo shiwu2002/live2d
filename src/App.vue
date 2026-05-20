@@ -68,7 +68,7 @@
 
     <!-- 独立日记面板（使用 Teleport 避免层级遮挡） -->
     <Teleport to="body">
-      <div v-if="showDiaryPanel" class="diary-modal-overlay" @click="showDiaryPanel = false">
+      <div v-if="showDiaryPanel && isLoggedIn" class="diary-modal-overlay" @click="showDiaryPanel = false">
         <div class="diary-modal" @click.stop>
           <div class="diary-header">
             <span class="diary-title">📖 龙宝的日记</span>
@@ -111,6 +111,8 @@
           :modelId="currentModel"
           :width="widgetWidth"
           :height="widgetHeight"
+          @loaded="handleLive2DModelLoaded"
+          @error="handleLive2DModelError"
         />
 
         <!-- 竖状好感度条（模型右上方） -->
@@ -252,6 +254,7 @@
                 <span>外部记忆导入</span>
               </button>
               <button
+                v-if="isLoggedIn"
                 class="dropdown-item"
                 @click="handleToggleDiary(); showMoreMenu = false"
                 title="查看日记"
@@ -329,7 +332,7 @@ import VoiceModelSettings from './components/VoiceModelSettings.vue'
 import Live2DModelManager from './components/Live2DModelManager.vue'
 import { autoModelConfig, getValidAutoModelIds } from './config/auto-models'
 import { live2dModelService, type Live2DModelInfo } from './services/live2dModelService'
-import { getChatConfig, generateSessionId } from './config'
+import { getChatConfig, generateSessionId, getEnvConfig } from './config'
 import { getWebSocketUrl, logEnvConfig } from './config'
 import { getDisplayConfig } from './config/display'
 import type { UserLoginInfo, UserInfo } from './types/login'
@@ -390,12 +393,51 @@ const chatWindowRef = ref<InstanceType<typeof ChatWindow> | null>(null)
 
 const remoteModels = ref<Live2DModelInfo[]>([])
 
+// 转换模型 URL（处理开发环境的 CORS 问题）
+const normalizeModelUrl = (modelUrl: string): string => {
+  if (!modelUrl) return ''
+
+  const config = getEnvConfig()
+
+  // 开发环境下，将完整的后端 URL 转换为相对路径
+  // 例如：https://shiwu.shop/model/hiyori/xxx.model3.json → /model/hiyori/xxx.model3.json
+  if (config.env === 'development' && config.apiBaseUrl === '') {
+    // 尝试移除常见的生产环境 base URL 前缀
+    const productionHosts = [
+      'https://shiwu.shop',
+      'http://localhost:8080',
+      'https://localhost:8080'
+    ]
+
+    for (const host of productionHosts) {
+      if (modelUrl.startsWith(host)) {
+        const relativePath = modelUrl.substring(host.length)
+        console.log(`[App] 转换模型URL（开发环境）: ${modelUrl} → ${relativePath}`)
+        return relativePath
+      }
+    }
+
+    // 如果不匹配任何已知主机，尝试提取路径部分
+    try {
+      const url = new URL(modelUrl)
+      console.log(`[App] 使用 URL 路径: ${modelUrl} → ${url.pathname}`)
+      return url.pathname
+    } catch {
+      // 如果不是有效 URL，原样返回
+      return modelUrl
+    }
+  }
+
+  // 生产环境或其他情况，原样返回
+  return modelUrl
+}
+
 const discoveredModels = computed<ModelInfo[]>(() => {
   if (remoteModels.value.length > 0) {
     return remoteModels.value.map(m => ({
       id: m.id,
       name: m.name,
-      path: m.modelUrl,
+      path: normalizeModelUrl(m.modelUrl),  // 使用转换后的路径
       isValid: true
     }))
   }
@@ -423,16 +465,28 @@ const modelPath = computed(() => {
 // 模型加载错误状态
 const modelLoadError = ref<string>('')
 
-// 验证并设置默认模型（选择第一个有效模型）
-const initializeDefaultModel = () => {
+// 验证并设置默认模型（选择第一个有效模型，或指定模型）
+const initializeDefaultModel = (preferredModelId?: string) => {
   const models = discoveredModels.value
   const validModels = models.filter(m => m.isValid)
 
   if (validModels.length > 0) {
-    if (!currentModel.value || !validModels.find(m => m.id === currentModel.value)) {
-      currentModel.value = validModels[0]!.id
-      console.log(`✅ 已加载 ${validModels.length} 个有效模型，默认: ${validModels[0]!.id}`)
+    // 如果指定了首选模型ID，且该模型有效，则使用它
+    if (preferredModelId && validModels.find(m => m.id === preferredModelId)) {
+      currentModel.value = preferredModelId
+      console.log(`✅ 已加载 ${validModels.length} 个有效模型，使用指定模型: ${preferredModelId}`)
+      return
     }
+
+    // 否则使用当前已选择的模型（如果仍有效）
+    if (currentModel.value && validModels.find(m => m.id === currentModel.value)) {
+      console.log(`✅ 已加载 ${validModels.length} 个有效模型，保持当前: ${currentModel.value}`)
+      return
+    }
+
+    // 最后选择第一个有效模型
+    currentModel.value = validModels[0]!.id
+    console.log(`✅ 已加载 ${validModels.length} 个有效模型，默认: ${validModels[0]!.id}`)
   } else {
     console.warn('⚠️  未找到有效的 Live2D 模型')
     modelLoadError.value = '未找到可用的模型文件'
@@ -782,8 +836,33 @@ const toggleLive2DModelManager = () => {
 
 // Live2D 模型变更回调
 const handleLive2DModelsChanged = async () => {
-  remoteModels.value = await live2dModelService.list()
-  initializeDefaultModel()
+  const newModels = await live2dModelService.list()
+  const oldModelCount = remoteModels.value.length
+  remoteModels.value = newModels
+
+  // 如果模型数量增加（新上传了模型），自动切换到最新上传的模型
+  if (newModels.length > oldModelCount && newModels.length > 0) {
+    // 假设后端返回的列表是按时间倒序排列，最新的在第一个
+    // 或者选择最后一个（如果按时间正序排列）
+    const latestModel = newModels[newModels.length - 1]!
+    console.log(`🎉 检测到新模型上传: ${latestModel.name} (${latestModel.id})`)
+    initializeDefaultModel(latestModel.id)
+  } else {
+    // 否则使用默认逻辑初始化
+    initializeDefaultModel()
+  }
+}
+
+// Live2D 模型加载成功回调
+const handleLive2DModelLoaded = () => {
+  console.log('✅ [App] Live2D 模型加载成功')
+  modelLoadError.value = ''
+}
+
+// Live2D 模型加载失败回调
+const handleLive2DModelError = (error: Error) => {
+  console.error('❌ [App] Live2D 模型加载失败:', error.message)
+  modelLoadError.value = `模型加载失败: ${error.message}`
 }
 
 // 好感度数据：从通知 WebSocket 实时获取（不再依赖 ChatWindow ref）
@@ -810,6 +889,13 @@ const chatUnreadDiaryCount = computed(() => {
 })
 
 const handleToggleDiary = () => {
+  // 未登录时禁止查看日记
+  if (!isLoggedIn.value) {
+    console.log('[App] 未登录，无法查看日记')
+    showUserAuthModal.value = true  // 弹出登录框
+    return
+  }
+
   showDiaryPanel.value = !showDiaryPanel.value
 
   if (showDiaryPanel.value && appDiaryList.value.length === 0) {
@@ -818,6 +904,12 @@ const handleToggleDiary = () => {
 }
 
 const loadAppDiaryList = async () => {
+  // 未登录时禁止加载日记
+  if (!isLoggedIn.value) {
+    console.log('[App] 未登录，无法加载日记列表')
+    return
+  }
+
   isLoadingAppDiary.value = true
   try {
     const engagementService = getUserEngagementService()
@@ -903,10 +995,48 @@ const handleUserAuthLoginSuccess = (userInfo: UserInfo) => {
   const token = localStorage.getItem('authToken')
   if (token) {
     notificationWs.connect(token)
+    // WebSocket 连接成功后立即加载初始数据（补拉离线期间的日记）
+    setupNotificationWsInitialLoad()
   }
 
   // 登录成功后加载 AI 模型列表
   loadAiModels()
+}
+
+// 设置通知 WebSocket 连接成功后的初始数据加载（补拉离线期间的日记）
+const setupNotificationWsInitialLoad = () => {
+  const unsubscribe = notificationWs.onConnected(async () => {
+    // 确保用户仍处于登录状态
+    if (!isLoggedIn.value) {
+      console.log('[App] 用户未登录，跳过初始数据加载')
+      unsubscribe()
+      return
+    }
+
+    console.log('[App] NotificationWS 已连接，开始加载初始数据（补拉离线日记）')
+    
+    try {
+      const engagementService = getUserEngagementService()
+      const initialData = await engagementService.loadInitialData()
+      
+      console.log('[App] 初始数据加载完成:', {
+        hasRelationship: !!initialData.relationship,
+        unreadDiaryCount: initialData.unreadDiaryCount,
+        recentDiariesCount: initialData.recentDiaries.length
+      })
+      
+      // 如果有离线期间的新日记，更新日记列表
+      if (initialData.recentDiaries.length > 0) {
+        appDiaryList.value = initialData.recentDiaries
+        console.log(`[App] 已补拉 ${initialData.recentDiaries.length} 条离线日记`)
+      }
+    } catch (error) {
+      console.error('[App] 加载初始数据失败:', error)
+    } finally {
+      // 只需要执行一次，执行后取消订阅
+      unsubscribe()
+    }
+  })
 }
 
 // 处理用户注册成功
@@ -924,6 +1054,11 @@ const handleLogout = () => {
 
   // 断开通知 WebSocket
   notificationWs.disconnect()
+
+  // 清空日记相关数据（防止退出后仍能看到日记内容）
+  showDiaryPanel.value = false
+  appDiaryList.value = []
+  isLoadingAppDiary.value = false
 
   // 重新生成匿名ID，或者保留原ID取决于业务需求
   wsConfig.value.openid = generateAnonymousUserId()
@@ -1070,6 +1205,8 @@ const checkLoginStatus = () => {
       const token = localStorage.getItem('authToken')
       if (token) {
         notificationWs.connect(token)
+        // WebSocket 连接成功后立即加载初始数据（补拉离线期间的日记）
+        setupNotificationWsInitialLoad()
       }
 
       // 恢复登录状态后加载 AI 模型列表
@@ -1113,6 +1250,8 @@ onMounted(async () => {
     const token = localStorage.getItem('authToken')
     if (token && !notificationWs.isConnected.value) {
       notificationWs.connect(token)
+      // WebSocket 连接成功后立即加载初始数据（补拉离线期间的日记）
+      setupNotificationWsInitialLoad()
     }
   }
 
