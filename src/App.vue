@@ -553,7 +553,8 @@ const hasActiveInteractiveUI = () => {
     showMemoryUpload.value ||
     showVoiceModelSettings.value ||
     showLive2DModelManager.value ||
-    showMoreMenu.value
+    showMoreMenu.value ||
+    showDiaryPanel.value
   )
 }
 
@@ -652,7 +653,7 @@ const onMainWindowFocused = () => {
 
 // 监听交互界面状态变化
 watch(
-  [showChat, showVoiceCall, showUserAuthModal, showCharacterSettings, showCustomModelManager, showMemoryUpload, showVoiceModelSettings, showLive2DModelManager, showMoreMenu],
+  [showChat, showVoiceCall, showUserAuthModal, showCharacterSettings, showCustomModelManager, showMemoryUpload, showVoiceModelSettings, showLive2DModelManager, showMoreMenu, showDiaryPanel],
   () => {
     if (!isDesktop.value) return
     const hasUI = hasActiveInteractiveUI()
@@ -800,10 +801,6 @@ const notifRelationshipLevel = computed(() => {
 const handleShowRelationshipDetail = () => {
   chatWindowRef.value?.showRelationshipDetail()
 }
-
-const isChatConnected = computed(() => {
-  return !!chatWindowRef.value
-})
 
 const chatUnreadDiaryCount = computed(() => {
   const raw = (chatWindowRef.value as any)?.unreadDiaryCount
@@ -1855,11 +1852,45 @@ const handleClickOutside = (e: MouseEvent) => {
   font-weight: 600;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   margin-left: auto;
 }
 
-/* 独立日记面板样式 */
+/* 更多菜单中的用户信息 */
+.dropdown-user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  margin-bottom: 2px;
+}
+.dropdown-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.dropdown-username {
+  font-size: 13px;
+  color: #e0e0e8;
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dropdown-user-id {
+  font-size: 11px;
+  color: #666;
+  flex-shrink: 0;
+}
+</style>
+
+<!-- 非scoped样式：用于Teleport到body的日记面板 -->
+<style>
 .diary-modal-overlay {
   position: fixed;
   inset: 0;
@@ -1868,10 +1899,10 @@ const handleClickOutside = (e: MouseEvent) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: fadeIn 0.2s ease;
+  animation: diaryFadeIn 0.2s ease;
 }
 
-@keyframes fadeIn {
+@keyframes diaryFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
@@ -1886,10 +1917,10 @@ const handleClickOutside = (e: MouseEvent) => {
   display: flex;
   flex-direction: column;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  animation: modalSlideIn 0.3s ease;
+  animation: diaryModalSlideIn 0.3s ease;
 }
 
-@keyframes modalSlideIn {
+@keyframes diaryModalSlideIn {
   from {
     transform: scale(0.9) translateY(20px);
     opacity: 0;
@@ -2021,38 +2052,5 @@ const handleClickOutside = (e: MouseEvent) => {
 
 .diary-modal .diary-body::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 107, 157, 0.3);
-}
-
-/* 更多菜单中的用户信息 */
-.dropdown-user-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 8px;
-  margin-bottom: 2px;
-}
-.dropdown-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-.dropdown-username {
-  font-size: 13px;
-  color: #e0e0e8;
-  font-weight: 500;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dropdown-user-id {
-  font-size: 11px;
-  color: #666;
-  flex-shrink: 0;
 }
 </style>
