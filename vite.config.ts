@@ -71,6 +71,11 @@ export default defineConfig({
             proxyReq.removeHeader('origin')
           })
         }
+      },
+      '/ws': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        ws: true
       }
     }
   },

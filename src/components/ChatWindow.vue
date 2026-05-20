@@ -29,10 +29,10 @@
           v-for="message in displayMessages"
           :key="message.id"
           class="message-item"
-          :class="[`message-${message.sender}`, { 'proactive-message': message.isProactive }]"
+          :class="[`message-${message.sender}`, { 'proactive-message': message.isProactive && message.subType }]"
         >
-          <!-- 主动推送消息标签 -->
-          <div v-if="message.isProactive" class="proactive-tag">
+          <!-- 特殊类型消息标签（日记/生活动态/思念） -->
+          <div v-if="message.isProactive && message.subType && ['diary', 'life_event', 'miss_you'].includes(message.subType)" class="proactive-tag">
             {{ getProactiveTagText(message.subType) }}
           </div>
 
@@ -42,22 +42,16 @@
             <div class="message-time">{{ formatTime(message.timestamp ?? Date.now()) }}</div>
           </div>
 
-          <!-- 日记消息（特殊卡片样式） -->
-          <div v-else-if="message.subType === 'diary'" class="diary-card">
-            <div class="diary-icon">📖</div>
-            <div class="diary-content">
-              <div class="diary-text">{{ getDiaryContent(message.content) }}</div>
-              <div class="diary-time">{{ formatTime(message.timestamp ?? Date.now()) }}</div>
-            </div>
+          <!-- 日记消息（普通文本样式） -->
+          <div v-else-if="message.subType === 'diary'" class="message-bubble text-message">
+            <div class="message-content">{{ getDiaryContent(message.content) }}</div>
+            <div class="message-time">{{ formatTime(message.timestamp ?? Date.now()) }}</div>
           </div>
 
-          <!-- 生活事件消息（动态卡片） -->
-          <div v-else-if="message.subType === 'life_event'" class="life-event-card">
-            <div class="life-event-icon">🌅</div>
-            <div class="life-event-content">
-              <div class="life-event-text">{{ getTextContent(message.content) }}</div>
-              <div class="life-event-time">{{ formatTime(message.timestamp ?? Date.now()) }}</div>
-            </div>
+          <!-- 生活事件消息（普通文本样式） -->
+          <div v-else-if="message.subType === 'life_event'" class="message-bubble text-message">
+            <div class="message-content">{{ getTextContent(message.content) }}</div>
+            <div class="message-time">{{ formatTime(message.timestamp ?? Date.now()) }}</div>
           </div>
 
           <!-- 语音消息 -->
@@ -284,6 +278,7 @@ import { uploadService } from '../services/uploadService'
 import { chatHistoryService, type HistoryRecord } from '../services/chatHistoryService'
 import { getUserEngagementService, type RelationshipData, type DiaryEntry, getFavorabilityLevel } from '../services/userEngagement'
 import { notificationService } from '../services/notification'
+import { notificationWs } from '../services/notificationWebSocket'
 import {
   getTextContent,
   getImageUrls,
@@ -317,6 +312,7 @@ const emit = defineEmits<{
 let wsService: WebSocketService | null = null
 let audioRecorder: AudioRecorder | null = null
 let audioPlayer: AudioPlayer | null = null
+let unsubNotification: (() => void) | null = null
 
 // 状态管理
 const messages = ref<ExtendedChatMessage[]>([])
@@ -339,7 +335,15 @@ const hasMoreHistory = ref(true)
 const historyNextId = ref<number | undefined>(undefined)
 
 // 新增：用户粘性功能相关状态
-const relationshipData = ref<RelationshipData | null>(null) // 好感度数据
+const relationshipData = computed<RelationshipData | null>(() => {
+  const notifRel = notificationWs.relationship.value
+  if (!notifRel) return null
+  return {
+    favorability: notifRel.favorability,
+    levelName: notifRel.levelName,
+    totalInteractions: notifRel.totalInteractions
+  }
+})
 const unreadDiaryCount = ref(0) // 未读日记数量
 const showDiaryPanel = ref(false) // 是否显示日记面板
 const diaryList = ref<DiaryEntry[]>([]) // 日记列表
@@ -444,14 +448,11 @@ const initializeServices = async () => {
     wsService.onConnection(handleConnection)
     wsService.onError(handleError)
 
-    // 新增：订阅主动推送消息事件
-    wsService.onProactiveMessage(handleProactiveMessage)
-
-    // 新增：订阅好感度变化事件
-    wsService.onFavorabilityChange(handleFavorabilityChange)
-
-    // 新增：订阅认证失败事件（Token 过期）
+    // 认证失败事件
     wsService.onAuthFailed(handleAuthFailed)
+
+    // 从通知 WebSocket 订阅主动推送消息（日记/思念/生活事件/主动聊天）
+    unsubNotification = notificationWs.onMessage(handleProactiveMessage)
 
     // 连接 WebSocket
     await wsService.connect()
@@ -567,58 +568,45 @@ const handleMessage = (message: ExtendedChatMessage) => {
 /**
  * 新增：处理主动推送消息（非用户触发的AI消息）
  */
-const handleProactiveMessage = (message: ExtendedChatMessage) => {
-  console.log('收到主动推送消息:', message.subType, message.content)
+const handleProactiveMessage = (msg: { subType?: string; content: string | any; type: string; animation?: any }) => {
+  console.log('收到主动推送消息:', msg.subType, msg.content)
 
-  // 发送浏览器通知
-  if (message.type === 'TEXT') {
-    const content = typeof message.content === 'string' ? message.content : JSON.stringify(message.content)
-    
-    if (message.subType === 'diary') {
-      // 日记通知
+  if (msg.type === 'TEXT') {
+    const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)
+
+    const proactiveMessage: ExtendedChatMessage = {
+      id: `proactive_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type: 'TEXT',
+      content: content,
+      sender: 'ai',
+      timestamp: Date.now(),
+      isProactive: true,
+      subType: msg.subType as any,
+      animation: msg.animation,
+    }
+
+    messages.value.push(proactiveMessage)
+
+    nextTick(() => {
+      scrollToBottom()
+    })
+
+    if (msg.subType === 'diary') {
       notificationService.sendDiaryNotification('龙宝')
-      // 更新未读计数
       unreadDiaryCount.value++
     } else {
-      // 其他主动消息通知
       notificationService.sendProactiveMessageNotification(content, '龙宝')
     }
   }
 }
 
 /**
- * 新增：处理好感度变化事件
- */
-const handleFavorabilityChange = (data: { favorability: number; delta: number; levelName: string }) => {
-  console.log('好感度变化:', data)
-
-  // 更新好感度数据
-  if (relationshipData.value) {
-    relationshipData.value = {
-      ...relationshipData.value,
-      favorability: data.favorability,
-      levelName: data.levelName
-    }
-
-    // 如果好感度提升，可以播放动画效果
-    if (data.delta > 0) {
-      console.log(`好感度提升了 ${data.delta} 点！`)
-      // 可以在这里添加心形粒子飘起等动画效果
-    }
-  }
-}
-
-/**
- * 新增：加载用户粘性数据
+ * 加载用户粘性数据（好感度和未读日记）
  */
 const loadUserEngagementData = async () => {
   try {
     const engagementService = getUserEngagementService()
     const initialData = await engagementService.loadInitialData()
-
-    if (initialData.relationship) {
-      relationshipData.value = initialData.relationship
-    }
 
     unreadDiaryCount.value = initialData.unreadDiaryCount
 
@@ -1015,7 +1003,7 @@ const getProactiveTagText = (subType?: string): string => {
     case 'miss_you':
       return '💭 思念'
     default:
-      return '💬 主动找你'
+      return ''
   }
 }
 
@@ -1023,25 +1011,18 @@ const getProactiveTagText = (subType?: string): string => {
  * 新增：获取消息气泡的CSS类名（根据消息类型）
  */
 const getMessageBubbleClass = (message: ExtendedChatMessage): string => {
-  const classes: string[] = []
-
-  if (message.isProactive) {
-    classes.push('proactive-bubble')
-  }
+  if (!message.isProactive || !message.subType) return ''
 
   switch (message.subType) {
     case 'diary':
-      classes.push('diary-bubble')
-      break
+      return 'diary-bubble'
     case 'life_event':
-      classes.push('life-event-bubble')
-      break
+      return 'life-event-bubble'
     case 'miss_you':
-      classes.push('miss-you-bubble')
-      break
+      return 'miss-you-bubble'
+    default:
+      return ''
   }
-
-  return classes.join(' ')
 }
 
 /**
@@ -1139,6 +1120,12 @@ const cleanupConnection = () => {
     if (audioPlayer) {
       audioPlayer.dispose()
       audioPlayer = null
+    }
+
+    // 取消通知 WebSocket 订阅
+    if (unsubNotification) {
+      unsubNotification()
+      unsubNotification = null
     }
   } catch (error) {
     console.error('清理连接时出错:', error)

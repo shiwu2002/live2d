@@ -87,21 +87,21 @@
         <div
           class="relationship-bar-vertical desktop-pet"
           @click="handleShowRelationshipDetail"
-          :title="chatRelationshipData ? `${chatRelationshipLevel.name} ${chatRelationshipData.favorability}/100` : '打开聊天后显示好感度'"
+          :title="notifRelationshipData ? `${notifRelationshipLevel.name} ${notifRelationshipData.favorability}/100` : '登录后显示好感度'"
         >
-          <div class="rv-icon">{{ chatRelationshipLevel.icon }}</div>
+          <div class="rv-icon">{{ notifRelationshipLevel.icon }}</div>
           <div class="rv-track">
             <div
               class="rv-fill"
               :style="{
-                height: `${chatRelationshipData?.favorability ?? 0}%`,
-                backgroundColor: chatRelationshipLevel.color
+                height: `${notifRelationshipData?.favorability ?? 0}%`,
+                backgroundColor: notifRelationshipLevel.color
               }"
             ></div>
-            <div class="rv-glow" :style="{ backgroundColor: chatRelationshipLevel.color }"></div>
+            <div class="rv-glow" :style="{ backgroundColor: notifRelationshipLevel.color }"></div>
           </div>
-          <div class="rv-label" :style="{ color: chatRelationshipLevel.color }">
-            {{ chatRelationshipData?.favorability ?? '-' }}
+          <div class="rv-label" :style="{ color: notifRelationshipLevel.color }">
+            {{ notifRelationshipData?.favorability ?? '-' }}
           </div>
         </div>
       </div>
@@ -309,7 +309,8 @@ import { authService } from './services/authService'
 import { setUnauthorizedHandler } from './services/httpClient'
 import { aiModelConfigService, aiModelSwitchService, type ModelConfig } from './services/aiModelConfig'
 import { isNativeApp } from './utils/capacitor'
-import { type RelationshipData, getFavorabilityLevel } from './services/userEngagement'
+import { getFavorabilityLevel } from './services/userEngagement'
+import { notificationWs, type NotificationRelationshipData } from './services/notificationWebSocket'
 
 import iconLogin from './images/zhanghudenglu-icon.png'
 import iconChat from './images/liaotian.png'
@@ -749,18 +750,16 @@ const handleLive2DModelsChanged = async () => {
   initializeDefaultModel()
 }
 
-// 从 ChatWindow 获取好感度数据（竖状条用）
-const chatRelationshipData = computed<RelationshipData | null>(() => {
-  const raw = chatWindowRef.value?.relationshipData
-  if (!raw) return null
-  return 'value' in raw ? (raw as any).value : raw as RelationshipData
+// 好感度数据：从通知 WebSocket 实时获取（不再依赖 ChatWindow ref）
+const notifRelationshipData = computed<NotificationRelationshipData | null>(() => {
+  return notificationWs.relationship.value
 })
 
-const chatRelationshipLevel = computed(() => {
-  if (!chatRelationshipData.value) {
+const notifRelationshipLevel = computed(() => {
+  if (!notifRelationshipData.value) {
     return { name: '陌生', color: '#9ca3af', icon: '🤍', stars: 1 }
   }
-  return getFavorabilityLevel(chatRelationshipData.value.favorability)
+  return getFavorabilityLevel(notifRelationshipData.value.favorability)
 })
 
 const handleShowRelationshipDetail = () => {
@@ -832,7 +831,13 @@ const handleUserAuthLoginSuccess = (userInfo: UserInfo) => {
   localStorage.setItem('authToken', userInfo.token)
   
   console.log('登录状态已更新，sessionId:', loginInfo.sessionId)
-  
+
+  // 连接通知 WebSocket（获取好感度数据 + 主动推送）
+  const token = localStorage.getItem('authToken')
+  if (token) {
+    notificationWs.connect(token)
+  }
+
   // 登录成功后加载 AI 模型列表
   loadAiModels()
 }
@@ -849,11 +854,14 @@ const handleUserAuthRegisterSuccess = (userInfo: UserInfo) => {
 const handleLogout = () => {
   isLoggedIn.value = false
   currentUser.value = null
-  
+
+  // 断开通知 WebSocket
+  notificationWs.disconnect()
+
   // 重新生成匿名ID，或者保留原ID取决于业务需求
   wsConfig.value.openid = generateAnonymousUserId()
   wsConfig.value.aiSessionId = generateSessionId()
-  
+
   localStorage.removeItem('userInfo')
   localStorage.removeItem('isLoggedIn')
   localStorage.removeItem('authToken')
@@ -990,7 +998,13 @@ const checkLoginStatus = () => {
       wsConfig.value.aiSessionId = userInfo.sessionId // 恢复正确的 sessionId
       
       console.log('恢复登录状态 - openid:', userInfo.openid, 'sessionId:', userInfo.sessionId)
-      
+
+      // 恢复登录状态后连接通知 WebSocket
+      const token = localStorage.getItem('authToken')
+      if (token) {
+        notificationWs.connect(token)
+      }
+
       // 恢复登录状态后加载 AI 模型列表
       loadAiModels()
     } catch (error) {
@@ -1026,6 +1040,14 @@ onMounted(async () => {
   widgetPosY.value = Math.max(0, h - Math.min(h - 20, height) - 20)
 
   console.log('onMounted desktop check, isDesktop:', isDesktop.value)
+
+  // 确保通知 WebSocket 在已登录状态下常驻连接
+  if (isLoggedIn.value) {
+    const token = localStorage.getItem('authToken')
+    if (token && !notificationWs.isConnected.value) {
+      notificationWs.connect(token)
+    }
+  }
 
   try {
     const models = await live2dModelService.list()

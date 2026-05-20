@@ -25,6 +25,7 @@ export interface EnvConfig {
   wsEndpoints: {
     chat: string          // 聊天服务
     voice: string         // 语音通话服务
+    notification: string   // 通知推送服务（主动消息/好感度变化）
   }
 }
 
@@ -70,7 +71,8 @@ const developmentConfig: EnvConfig = {
   wsBaseUrl: 'ws://localhost:8080',
   wsEndpoints: {
     chat: '/ws/chat',
-    voice: '/ws/voice'
+    voice: '/ws/voice',
+    notification: '/ws/notification'
   }
 }
 
@@ -82,7 +84,8 @@ const productionConfig: EnvConfig = {
   wsBaseUrl: 'wss://shiwu.shop',  // 使用 wss:// 协议，Nginx 会代理转换为 ws://
   wsEndpoints: {
     chat: '/ws/chat',
-    voice: '/ws/voice'
+    voice: '/ws/voice',
+    notification: '/ws/notification'
   }
 }
 
