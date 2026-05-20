@@ -50,11 +50,11 @@ class NotificationWebSocketService {
     const protocol = config.wsBaseUrl.startsWith('wss') ? 'wss:' : 'ws:'
     let host: string
     if (isNativeApp()) {
-      host = config.wsBaseUrl.replace(/^wss?/, '')
+      host = config.wsBaseUrl.replace(/^wss?:\/\//, '')
     } else if (config.env === 'development') {
       host = `${window.location.host}`
     } else {
-      host = config.wsBaseUrl.replace(/^wss?/, '')
+      host = config.wsBaseUrl.replace(/^wss?:\/\//, '')
     }
     const url = `${protocol}//${host}/ws/notification?token=${encodeURIComponent(token)}`
 
