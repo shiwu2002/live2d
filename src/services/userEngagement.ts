@@ -4,6 +4,7 @@
  */
 
 import { fetchWithAuth } from './httpClient'
+import { getApiBaseUrl } from '../config'
 
 // 好感度信息接口
 export interface RelationshipData {
@@ -155,7 +156,7 @@ let userEngagementServiceInstance: UserEngagementService | null = null
  */
 export function getUserEngagementService(baseUrl?: string): UserEngagementService {
   if (!userEngagementServiceInstance) {
-    userEngagementServiceInstance = new UserEngagementService(baseUrl)
+    userEngagementServiceInstance = new UserEngagementService(baseUrl || getApiBaseUrl())
   }
   return userEngagementServiceInstance
 }
