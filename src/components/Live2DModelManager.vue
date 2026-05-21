@@ -22,8 +22,8 @@
             <div class="lm-card-info">
               <div class="lm-card-name">{{ model.name }}</div>
               <div class="lm-card-meta">
-                <span class="lm-tag" :class="model.isDefault ? 'tag-default' : 'tag-custom'">
-                  {{ model.isDefault ? '默认' : '自定义' }}
+                <span class="lm-tag" :class="getModelTagClass(model)">
+                  {{ getModelTagText(model) }}
                 </span>
                 <span class="lm-card-id">{{ model.id }}</span>
               </div>
@@ -33,7 +33,7 @@
             </div>
             <div class="lm-card-actions">
               <button
-                v-if="!model.isDefault"
+                v-if="canDeleteModel(model)"
                 class="lm-btn lm-btn-del"
                 @click="handleDelete(model)"
                 :disabled="deleting === model.id"
@@ -95,8 +95,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { live2dModelService, type Live2DModelInfo } from '../services/live2dModelService'
+import { authService } from '../services/authService'
 
 const props = defineProps<{
   visible: boolean
@@ -115,6 +116,30 @@ const selectedFile = ref<File | null>(null)
 const uploadName = ref('')
 const isDragOver = ref(false)
 const fileInputRef = ref<HTMLInputElement>()
+
+const currentUserId = computed(() => {
+  const userInfo = authService.getUserInfo()
+  return userInfo?.id || userInfo?.userId || null
+})
+
+const canDeleteModel = (model: Live2DModelInfo): boolean => {
+  if (model.isDefault) return false
+  if (!currentUserId.value) return true
+  if (!model.ownerId) return true
+  return model.ownerId === currentUserId.value
+}
+
+const getModelTagClass = (model: Live2DModelInfo): string => {
+  if (model.isDefault) return 'tag-default'
+  if (currentUserId.value && model.ownerId === currentUserId.value) return 'tag-mine'
+  return 'tag-custom'
+}
+
+const getModelTagText = (model: Live2DModelInfo): string => {
+  if (model.isDefault) return '系统默认'
+  if (currentUserId.value && model.ownerId === currentUserId.value) return '我的模型'
+  return '其他用户'
+}
 
 const loadModels = async () => {
   loading.value = true
@@ -189,7 +214,12 @@ const handleDelete = async (model: Live2DModelInfo) => {
     await loadModels()
     emit('changed')
   } catch (err: any) {
-    alert(err.message || '删除失败')
+    const errorMessage = err.message || '删除失败'
+    if (errorMessage.includes('无权删除') || errorMessage.includes('权限') || errorMessage.includes('只能删除')) {
+      alert('你只能删除自己上传的模型')
+    } else {
+      alert(errorMessage)
+    }
   } finally {
     deleting.value = null
   }
@@ -352,7 +382,8 @@ onMounted(() => {
   letter-spacing: 0.3px;
 }
 .tag-default { background: rgba(108, 92, 231, 0.15); color: #a29bfe; }
-.tag-custom { background: rgba(46, 213, 115, 0.12); color: #7bed9f; }
+.tag-mine { background: rgba(46, 213, 115, 0.12); color: #7bed9f; }
+.tag-custom { background: rgba(255, 159, 67, 0.12); color: #ffa94d; }
 
 .lm-card-id {
   font-size: 12px;

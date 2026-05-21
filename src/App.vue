@@ -822,20 +822,27 @@ const toggleLive2DModelManager = () => {
 
 // Live2D 模型变更回调
 const handleLive2DModelsChanged = async () => {
-  const newModels = await live2dModelService.list()
-  const oldModelCount = remoteModels.value.length
-  remoteModels.value = newModels
+  await loadRemoteModels()
+}
 
-  // 如果模型数量增加（新上传了模型），自动切换到最新上传的模型
-  if (newModels.length > oldModelCount && newModels.length > 0) {
-    // 假设后端返回的列表是按时间倒序排列，最新的在第一个
-    // 或者选择最后一个（如果按时间正序排列）
-    const latestModel = newModels[newModels.length - 1]!
-    console.log(`🎉 检测到新模型上传: ${latestModel.name} (${latestModel.id})`)
-    initializeDefaultModel(latestModel.id)
-  } else {
-    // 否则使用默认逻辑初始化
-    initializeDefaultModel()
+/**
+ * 加载远程 Live2D 模型列表（统一封装，支持用户隔离）
+ */
+const loadRemoteModels = async () => {
+  try {
+    const models = await live2dModelService.list()
+    const oldModelCount = remoteModels.value.length
+    remoteModels.value = models
+
+    // 如果模型数量变化，重新初始化默认模型
+    if (models.length > 0) {
+      initializeDefaultModel()
+    }
+
+    console.log(`[App] 远程 Live2D 模型列表已加载: ${models.length} 个模型`)
+  } catch (error) {
+    console.error('[App] 加载远程 Live2D 模型列表失败:', error)
+    remoteModels.value = []
   }
 }
 
@@ -951,9 +958,9 @@ const handleWsAuthFailed = () => {
 
 
 // 处理用户名密码登录成功
-const handleUserAuthLoginSuccess = (userInfo: UserInfo) => {
+const handleUserAuthLoginSuccess = async (userInfo: UserInfo) => {
   console.log('用户名密码登录成功:', userInfo)
-  
+
   // 将UserInfo转换为UserLoginInfo格式以兼容现有逻辑
   const loginInfo: UserLoginInfo = {
     openid: userInfo.userId, // 使用userId作为openid
@@ -961,20 +968,24 @@ const handleUserAuthLoginSuccess = (userInfo: UserInfo) => {
     avatar: userInfo.avatar || '',
     sessionId: userInfo.aiSessionId || generateSessionId()
   }
-  
+
   isLoggedIn.value = true
   currentUser.value = loginInfo
-  
+
   // 更新WebSocket配置
   wsConfig.value.openid = loginInfo.openid
   wsConfig.value.aiSessionId = loginInfo.sessionId
-  
+
   // 保存登录信息到本地存储
   localStorage.setItem('userInfo', JSON.stringify(loginInfo))
   localStorage.setItem('isLoggedIn', 'true')
   localStorage.setItem('authToken', userInfo.token)
-  
+
   console.log('登录状态已更新，sessionId:', loginInfo.sessionId)
+
+  // 重置 Live2D 模型服务缓存并重新加载（实现用户隔离）
+  live2dModelService.resetApiStatus()
+  await loadRemoteModels()
 
   // 连接通知 WebSocket（获取好感度数据 + 主动推送）
   const token = localStorage.getItem('authToken')
@@ -1045,6 +1056,10 @@ const handleLogout = () => {
   appDiaryList.value = []
   isLoadingAppDiary.value = false
 
+  // 清空远程模型数据并重置服务状态（实现用户隔离）
+  remoteModels.value = []
+  live2dModelService.resetApiStatus()
+
   // 重新生成匿名ID，或者保留原ID取决于业务需求
   wsConfig.value.openid = generateAnonymousUserId()
   wsConfig.value.aiSessionId = generateSessionId()
@@ -1054,6 +1069,9 @@ const handleLogout = () => {
   localStorage.removeItem('authToken')
   authService.logout()
   console.log('已退出登录')
+
+  // 重新初始化模型（使用本地/默认模型）
+  initializeDefaultModel()
 }
 
 // 注册 401 未授权回调：token 失效时自动退出登录
@@ -1173,17 +1191,17 @@ const handleAiModelChange = async () => {
 const checkLoginStatus = () => {
   const savedLoginStatus = localStorage.getItem('isLoggedIn')
   const savedUserInfo = localStorage.getItem('userInfo')
-  
+
   if (savedLoginStatus === 'true' && savedUserInfo) {
     try {
       const userInfo = JSON.parse(savedUserInfo) as UserLoginInfo
       isLoggedIn.value = true
       currentUser.value = userInfo
-      
+
       // 更新 WebSocket 配置
       wsConfig.value.openid = userInfo.openid
       wsConfig.value.aiSessionId = userInfo.sessionId // 恢复正确的 sessionId
-      
+
       console.log('恢复登录状态 - openid:', userInfo.openid, 'sessionId:', userInfo.sessionId)
 
       // 恢复登录状态后连接通知 WebSocket
@@ -1196,6 +1214,10 @@ const checkLoginStatus = () => {
 
       // 恢复登录状态后加载 AI 模型列表
       loadAiModels()
+
+      // 恢复登录状态后重新加载 Live2D 模型列表（实现用户隔离）
+      live2dModelService.resetApiStatus()
+      loadRemoteModels()
     } catch (error) {
       console.error('解析本地登录信息失败:', error)
       handleLogout()
@@ -1236,11 +1258,8 @@ onMounted(async () => {
   }
 
   try {
-    const models = await live2dModelService.list()
-    if (models.length > 0) {
-      remoteModels.value = models
-      initializeDefaultModel()
-    }
+    // 初始化时加载远程 Live2D 模型列表
+    await loadRemoteModels()
   } catch {
     console.warn('远程模型列表获取失败，使用本地模型')
   }

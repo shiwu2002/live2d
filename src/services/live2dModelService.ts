@@ -7,6 +7,7 @@ export interface Live2DModelInfo {
   modelUrl: string
   previewImage?: string
   isDefault: boolean
+  ownerId?: string
   createdAt: string
   fileSize?: number
   fileCount?: number
