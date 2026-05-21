@@ -119,7 +119,7 @@ const fileInputRef = ref<HTMLInputElement>()
 
 const currentUserId = computed(() => {
   const userInfo = authService.getUserInfo()
-  return userInfo?.id || userInfo?.userId || null
+  return userInfo?.userId || null
 })
 
 const canDeleteModel = (model: Live2DModelInfo): boolean => {

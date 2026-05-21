@@ -831,7 +831,6 @@ const handleLive2DModelsChanged = async () => {
 const loadRemoteModels = async () => {
   try {
     const models = await live2dModelService.list()
-    const oldModelCount = remoteModels.value.length
     remoteModels.value = models
 
     // 如果模型数量变化，重新初始化默认模型
