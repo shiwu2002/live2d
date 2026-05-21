@@ -96,12 +96,76 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // 处理所有到 shiwu.shop 的请求，解决 CORS 跨域问题
+  const targetUrls = [
+    'https://shiwu.shop/*',
+    'http://shiwu.shop/*',
+    'wss://shiwu.shop/*',
+    'ws://shiwu.shop/*'
+  ]
+
+  // 清除缓存，确保使用最新的 CORS 配置
+  session.defaultSession.clearCache()
+  session.defaultSession.clearStorageData({
+    storages: ['cookies', 'localStorage']
+  })
+
+  // 1. 修改请求头：伪造 Origin 和 Referer，绕过服务器的 CORS 检查
   session.defaultSession.webRequest.onBeforeSendHeaders(
-    { urls: ['https://shiwu.shop/*', 'wss://shiwu.shop/*'] },
+    { urls: targetUrls },
     (details, callback) => {
+      // 移除可能导致问题的原始 Origin
+      delete details.requestHeaders['Origin']
+      delete details.requestHeaders['Referer']
+
+      // 设置伪造的请求头
       details.requestHeaders['Origin'] = 'https://shiwu.shop'
       details.requestHeaders['Referer'] = 'https://shiwu.shop/'
+
+      console.log('[Electron] 修改请求头:', details.url)
+
       callback({ requestHeaders: details.requestHeaders })
+    }
+  )
+
+  // 2. 修改响应头：强制添加 CORS 允许头，确保前端能正常读取响应
+  session.defaultSession.webRequest.onHeadersReceived(
+    { urls: targetUrls },
+    (details, callback) => {
+      const responseHeaders = { ...details.responseHeaders }
+
+      // 删除服务器返回的原始 CORS 头（避免冲突）
+      delete responseHeaders['access-control-allow-origin']
+      delete responseHeaders['Access-Control-Allow-Origin']
+      delete responseHeaders['access-control-allow-methods']
+      delete responseHeaders['Access-Control-Allow-Methods']
+      delete responseHeaders['access-control-allow-headers']
+      delete responseHeaders['Access-Control-Allow-Headers']
+      delete responseHeaders['access-control-allow-credentials']
+      delete responseHeaders['Access-Control-Allow-Credentials']
+      delete responseHeaders['access-control-max-age']
+      delete responseHeaders['Access-Control-Max-Age']
+
+      // 设置新的 CORS 响应头
+      responseHeaders['Access-Control-Allow-Origin'] = ['*']
+      responseHeaders['Access-Control-Allow-Credentials'] = ['true']
+      responseHeaders['Access-Control-Allow-Methods'] = [
+        'GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'
+      ]
+      responseHeaders['Access-Control-Allow-Headers'] = [
+        'Content-Type',
+        'Authorization',
+        'X-Requested-With',
+        'Accept',
+        'Origin',
+        'Cache-Control',
+        'Pragma'
+      ]
+      responseHeaders['Access-Control-Max-Age'] = ['86400']
+
+      console.log('[Electron] 修改响应头:', details.url, details.statusCode)
+
+      callback({ responseHeaders })
     }
   )
 
