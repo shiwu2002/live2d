@@ -41,13 +41,21 @@ export function getTextContent(content: string | object): string {
 export function getImageUrls(content: string | object): string[] {
   try {
     if (typeof content === 'string') {
-      const parsed = JSON.parse(content)
+      const trimmedContent = content.trim()
+
+      if (trimmedContent.startsWith('http://') || trimmedContent.startsWith('https://')) {
+        return [trimmedContent]
+      }
+
+      const parsed = JSON.parse(trimmedContent)
       if (Array.isArray(parsed.images)) {
         return parsed.images
       }
-      // 如果直接是数组
       if (Array.isArray(parsed)) {
         return parsed
+      }
+      if (typeof parsed === 'string' && (parsed.startsWith('http://') || parsed.startsWith('https://'))) {
+        return [parsed]
       }
     } else if (typeof content === 'object' && content !== null) {
       const obj = content as any
@@ -57,7 +65,6 @@ export function getImageUrls(content: string | object): string[] {
       if (Array.isArray(obj.urls)) {
         return obj.urls
       }
-      // 如果content本身就是数组
       if (Array.isArray(content)) {
         return content as string[]
       }
