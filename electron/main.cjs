@@ -14,6 +14,104 @@ let interactiveUIActive = false
 const TOOLBAR_ZONE_HEIGHT = 140 // 底部工具栏区域高度
 const POLL_INTERVAL_MS = 100
 
+// ==================== 全局应用切换监听 ====================
+let appSwitchMonitorInterval = null
+let lastForegroundWindowHandle = null
+let isAppSwitchMonitorRunning = false
+const APP_SWITCH_CHECK_INTERVAL = 500 // 每 500ms 检查一次前台窗口变化
+
+/**
+ * 获取当前前台窗口的句柄（仅 Windows 平台）
+ * 使用 user32.dll 的 GetForegroundWindow API
+ */
+function getForegroundWindowHandle() {
+  if (process.platform !== 'win32') {
+    return null // 非 Windows 平台暂不支持
+  }
+
+  try {
+    const { execSync } = require('child_process')
+    
+    // 使用 PowerShell 调用 Windows API 获取前台窗口句柄
+    const result = execSync(
+      'powershell -Command "Add-Type \'using System; using System.Runtime.InteropServices; public class Win32 { [DllImport(\\"user32.dll\\")] public static extern IntPtr GetForegroundWindow(); }\' -PassThru | ForEach-Object { $_::GetForegroundWindow() }"',
+      { encoding: 'utf8', timeout: 100 }
+    ).trim()
+    
+    return result || null
+  } catch (error) {
+    console.error('[AppSwitch] 获取前台窗口失败:', error.message)
+    return null
+  }
+}
+
+/**
+ * 启动全局应用切换监听
+ * 当检测到用户切换到其他应用时，通知渲染进程执行截图
+ */
+function startAppSwitchMonitor() {
+  if (isAppSwitchMonitorRunning || !mainWindow) return
+  
+  isAppSwitchMonitorRunning = true
+  console.log('[AppSwitch] ✓ 启动全局应用切换监听（每', APP_SWITCH_CHECK_INTERVAL, 'ms 检查一次）')
+
+  // 初始化时记录当前窗口
+  lastForegroundWindowHandle = mainWindow.id.toString()
+
+  appSwitchMonitorInterval = setInterval(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      stopAppSwitchMonitor()
+      return
+    }
+
+    try {
+      const currentForegroundHandle = getForegroundWindowHandle()
+      
+      // 如果获取不到句柄，跳过本次检查
+      if (!currentForegroundHandle) return
+
+      // 检查是否发生了窗口切换
+      const windowChanged = currentForegroundHandle !== lastForegroundWindowHandle
+      
+      if (windowChanged && lastForegroundWindowHandle !== null) {
+        const isOurWindowFocused = currentForegroundHandle === mainWindow.id.toString()
+        
+        if (!isOurWindowFocused) {
+          // 用户从我们的应用切换到了其他应用
+          console.log('[AppSwitch] 🎯 检测到用户切换到其他应用！')
+          console.log('[AppSwitch]   上次窗口:', lastForegroundWindowHandle)
+          console.log('[AppSwitch]   当前窗口:', currentForegroundHandle)
+          
+          // 通知渲染进程：用户已切换到其他应用，立即截图
+          mainWindow.webContents.send('app-switched-to-other')
+        } else {
+          // 用户切回了我们的应用
+          console.log('[AppSwitch] 🔄 用户切回了本应用')
+          mainWindow.webContents.send('app-switched-back')
+        }
+      }
+
+      // 更新上次记录
+      lastForegroundWindowHandle = currentForegroundHandle
+    } catch (error) {
+      console.error('[AppSwitch] 监听出错:', error.message)
+    }
+  }, APP_SWITCH_CHECK_INTERVAL)
+}
+
+/**
+ * 停止全局应用切换监听
+ */
+function stopAppSwitchMonitor() {
+  if (appSwitchMonitorInterval) {
+    clearInterval(appSwitchMonitorInterval)
+    appSwitchMonitorInterval = null
+  }
+  isAppSwitchMonitorRunning = false
+  lastForegroundWindowHandle = null
+  console.log('[AppSwitch] ✗ 已停止全局应用切换监听')
+}
+
 function startPenetrationPolling() {
   backgroundHidden = true
   if (penetrationPollInterval) return
@@ -251,4 +349,23 @@ ipcMain.on('focus-window', () => {
   if (mainWindow) {
     mainWindow.focus()
   }
+})
+
+// ==================== 全局应用切换监听 IPC 接口 ====================
+
+// 启动全局应用切换监听
+ipcMain.on('start-app-switch-monitor', () => {
+  console.log('[IPC] 收到启动应用切换监听请求')
+  startAppSwitchMonitor()
+})
+
+// 停止全局应用切换监听
+ipcMain.on('stop-app-switch-monitor', () => {
+  console.log('[IPC] 收到停止应用切换监听请求')
+  stopAppSwitchMonitor()
+})
+
+// 查询监听状态
+ipcMain.handle('is-app-switch-monitor-running', () => {
+  return isAppSwitchMonitorRunning
 })

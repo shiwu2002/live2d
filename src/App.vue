@@ -343,6 +343,7 @@ import { aiModelConfigService, aiModelSwitchService, type ModelConfig } from './
 import { isNativeApp } from './utils/capacitor'
 import { getUserEngagementService, getFavorabilityLevel } from './services/userEngagement'
 import { notificationWs, type NotificationRelationshipData } from './services/notificationWebSocket'
+import { screenCaptureService } from './services/screenCapture'
 
 import iconLogin from './images/zhanghudenglu-icon.png'
 import iconChat from './images/liaotian.png'
@@ -996,6 +997,9 @@ const handleUserAuthLoginSuccess = async (userInfo: UserInfo) => {
 
   // 登录成功后加载 AI 模型列表
   loadAiModels()
+
+  // 登录成功后启动屏幕环境感知功能（如果用户配置了视觉模型，会自动启用；否则会在首次上传后停止）
+  screenCaptureService.start(10000)
 }
 
 // 设置通知 WebSocket 连接成功后的初始数据加载（补拉离线期间的日记）
@@ -1049,6 +1053,9 @@ const handleLogout = () => {
 
   // 断开通知 WebSocket
   notificationWs.disconnect()
+
+  // 停止屏幕环境感知功能
+  screenCaptureService.stop()
 
   // 清空日记相关数据（防止退出后仍能看到日记内容）
   showDiaryPanel.value = false
@@ -1239,6 +1246,9 @@ onMounted(async () => {
 
   document.addEventListener('click', handleClickOutside)
 
+  // 监听页面可见性变化，优化屏幕截图服务
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+
   const w = window.innerWidth
   const h = window.innerHeight
   const width = displayCfg.widget.width
@@ -1307,6 +1317,7 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('resize', updateIsMobile)
   document.removeEventListener('click', handleClickOutside)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
   clearEnableIgnoreTimer()
   if (mousePenetrationListener) {
     document.removeEventListener('mousemove', mousePenetrationListener)
@@ -1320,12 +1331,38 @@ onUnmounted(() => {
     clearInterval(autoExpressionInterval)
     autoExpressionInterval = null
   }
+
+  // 组件卸载时停止屏幕截图服务
+  screenCaptureService.stop()
 })
 
 const handleClickOutside = (e: MouseEvent) => {
   const target = e.target as HTMLElement
   if (!target.closest('.more-menu-wrapper')) {
     showMoreMenu.value = false
+  }
+}
+
+/**
+ * 处理页面可见性变化
+ * 页面隐藏时停止屏幕截图，恢复时立即截图（第一时间捕获环境变化）
+ */
+const handleVisibilityChange = () => {
+  if (document.hidden) {
+    console.log('[App] 页面隐藏，暂停屏幕截图服务')
+    screenCaptureService.stop()
+  } else if (isLoggedIn.value) {
+    console.log('[App] 页面可见，恢复屏幕截图服务并立即截图')
+    
+    // 先启动服务（如果未运行）
+    if (!screenCaptureService.isRunning()) {
+      screenCaptureService.start(10000)
+    }
+    
+    // 立即触发一次截图，捕获当前环境
+    setTimeout(() => {
+      screenCaptureService.captureImmediately()
+    }, 500) // 延迟 500ms 确保页面完全渲染
   }
 }
 </script>
