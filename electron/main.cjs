@@ -1,6 +1,10 @@
 const { app, BrowserWindow, ipcMain, screen, session } = require('electron')
 const path = require('path')
 
+app.commandLine.appendSwitch('disable-gpu-shader-disk-cache')
+app.commandLine.appendSwitch('disable-gpu-sandbox')
+app.setPath('userData', path.join(app.getPath('appData'), 'live2d-pet'))
+
 let mainWindow
 let isDragging = false
 let dragOffset = { x: 0, y: 0 }
@@ -172,7 +176,8 @@ function createWindow() {
   })
 
   if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
-    mainWindow.loadURL('http://localhost:5173')
+    const devPort = process.env.VITE_DEV_SERVER_PORT || '5173'
+    mainWindow.loadURL(`http://localhost:${devPort}`)
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
