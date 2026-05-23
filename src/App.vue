@@ -541,10 +541,8 @@ const initializeDefaultModel = (preferredModelId?: string) => {
   }
 }
 
-// 小窗口配置 - 固定尺寸，适合 Live2D 模型显示比例
+// 小窗口配置
 const displayCfg = getDisplayConfig()
-const widgetWidth = ref(displayCfg.widget.width)
-const widgetHeight = ref(displayCfg.widget.height)
 
 const widgetPosX = ref<number>(0)
 const widgetPosY = ref<number>(0)
