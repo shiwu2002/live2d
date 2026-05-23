@@ -1389,11 +1389,14 @@ defineExpose({
 }
 
 .image-message-wrapper {
-  max-width: 70%;
+  max-width: 40%;
+  max-height: 180px;
 }
 
 .image-direct {
   width: 100%;
+  max-height: 180px;
+  object-fit: contain;
   border-radius: 10px;
   cursor: pointer;
   transition: transform 0.2s ease;
@@ -1818,7 +1821,8 @@ defineExpose({
   }
   
   .image-message {
-    max-width: 85%;
+    max-width: 55%;
+    max-height: 140px;
   }
   
   .image-grid {
