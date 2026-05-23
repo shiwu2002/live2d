@@ -468,7 +468,10 @@ const initializeServices = async () => {
     console.log('聊天服务初始化成功')
 
     // 加载历史记录
-    loadHistory()
+    await loadHistory()
+
+    // 历史加载完成后滚动到底部
+    nextTick(() => scrollToBottom())
 
     // 新增：加载用户粘性数据（好感度和未读日记）
     await loadUserEngagementData()
