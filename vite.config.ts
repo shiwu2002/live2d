@@ -5,7 +5,7 @@ const host = process.env.TAURI_DEV_HOST
 
 export default defineConfig({
   plugins: [vue()],
-  base: process.env.TAURI_ENV_PLATFORM ? './' : '/live2d/',
+  base: (process.env.TAURI_ENV_PLATFORM || process.env.CAPACITOR) ? './' : '/live2d/',
 
   server: {
     port: 5173,

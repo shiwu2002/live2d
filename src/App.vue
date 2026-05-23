@@ -96,9 +96,60 @@
       </div>
     </Teleport>
 
+    <!-- 好感度详情弹窗（独立于聊天框） -->
+    <Teleport to="body">
+      <div v-if="showRelationshipDetailModal && isLoggedIn" class="relationship-modal-overlay" @click="closeRelationshipDetail">
+        <div class="relationship-modal" @click.stop>
+          <div class="modal-header">
+            <h3>💕 好感度详情</h3>
+            <button class="modal-close-btn" @click="closeRelationshipDetail">✕</button>
+          </div>
+          <div class="modal-body" v-if="notifRelationshipData">
+            <div class="level-display">
+              <span class="level-big-icon">{{ notifRelationshipLevel.icon }}</span>
+              <div class="level-info">
+                <div class="level-name" :style="{ color: notifRelationshipLevel.color }">
+                  {{ notifRelationshipLevel.name }}
+                </div>
+                <div class="level-stars">
+                  <span v-for="i in notifRelationshipLevel.stars" :key="i">⭐</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="progress-section">
+              <div class="progress-label">好感度进度</div>
+              <div class="progress-bar-large">
+                <div
+                  class="progress-fill-large"
+                  :style="{ width: `${notifRelationshipData.favorability}%`, backgroundColor: notifRelationshipLevel.color }"
+                ></div>
+              </div>
+              <div class="progress-value">{{ notifRelationshipData.favorability }} / 100</div>
+            </div>
+
+            <div class="stats-grid">
+              <div class="stat-item">
+                <div class="stat-value">{{ notifRelationshipData.totalInteractions }}</div>
+                <div class="stat-label">互动次数</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value">{{ getNextLevelProgress() }}%</div>
+                <div class="stat-label">距离下一等级</div>
+              </div>
+            </div>
+
+            <div class="level-description">
+              {{ getLevelDescription(notifRelationshipData.favorability) }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <div v-if="discoveredModels.length > 0" class="pet-container desktop-pet">
       <div class="background-board" :class="{ 'hidden': !showBackground }">
-        <div class="drag-handle-top-right" @mousedown="handleDragStart" title="拖拽移动窗口">
+        <div v-if="!isAndroidDevice" class="drag-handle-top-right" @mousedown="handleDragStart" title="拖拽移动窗口">
           <img src="./images/移动.png" class="drag-icon" alt="拖拽" />
         </div>
       </div>
@@ -169,6 +220,15 @@
             :title="showBackground ? '隐藏背景板' : '显示背景板'"
           >
             <span class="background-icon">🎨</span>
+          </button>
+
+          <button
+            v-if="isAndroidDevice"
+            class="control-btn android-features-btn"
+            @click="showAndroidPanel = true"
+            title="Android 专属功能"
+          >
+            <span class="android-icon">📱</span>
           </button>
 
           <div class="more-menu-wrapper">
@@ -316,6 +376,11 @@
     <div v-if="preferenceMessage" class="global-toast" :class="preferenceMessage.type">
       {{ preferenceMessage.text }}
     </div>
+
+    <AndroidFeaturePanel
+      v-if="showAndroidPanel"
+      @close="showAndroidPanel = false"
+    />
   </div>
 </template>
 
@@ -340,10 +405,11 @@ import type { Live2DAnimationCommand } from './types/live2d'
 import { authService } from './services/authService'
 import { setUnauthorizedHandler } from './services/httpClient'
 import { aiModelConfigService, aiModelSwitchService, type ModelConfig } from './services/aiModelConfig'
-import { isNativeApp } from './utils/capacitor'
+import { isNativeApp, isAndroid, isElectron } from './utils/platform'
 import { getUserEngagementService, getFavorabilityLevel } from './services/userEngagement'
 import { notificationWs, type NotificationRelationshipData } from './services/notificationWebSocket'
 import { screenCaptureService } from './services/screenCapture'
+import AndroidFeaturePanel from './components/AndroidFeaturePanel.vue'
 
 import iconLogin from './images/zhanghudenglu-icon.png'
 import iconChat from './images/liaotian.png'
@@ -351,8 +417,11 @@ import iconVoice from './images/a-yuyindianhuatongzhi48.png'
 import iconCharacter from './images/jiaoseguanlijiaoseshezhi.png'
 import iconMore from './images/gengduo.png'
 
-const isDesktop = ref(!!(window as any).electronAPI?.isElectron)
+const isDesktop = ref(isElectron())
 const isMobileApp = ref(isNativeApp())
+const isAndroidDevice = ref(isAndroid())
+
+const showAndroidPanel = ref(false)
 
 const handleDragStart = (e: MouseEvent) => {
   console.log('handleDragStart called')
@@ -532,6 +601,9 @@ const showDiaryPanel = ref(false)
 const appDiaryList = ref<any[]>([])
 const isLoadingAppDiary = ref(false)
 const appDiaryBody = ref<HTMLElement | null>(null)
+
+// 好感度详情弹窗状态（独立于聊天框）
+const showRelationshipDetailModal = ref(false)
 
 // 更多菜单下拉状态
 const showMoreMenu = ref(false)
@@ -870,7 +942,39 @@ const notifRelationshipLevel = computed(() => {
 })
 
 const handleShowRelationshipDetail = () => {
-  chatWindowRef.value?.showRelationshipDetail()
+  if (!isLoggedIn.value) {
+    console.log('[App] 未登录，无法查看好感度详情')
+    showUserAuthModal.value = true
+    return
+  }
+  showRelationshipDetailModal.value = true
+}
+
+const closeRelationshipDetail = () => {
+  showRelationshipDetailModal.value = false
+}
+
+const getNextLevelProgress = (): number => {
+  if (!notifRelationshipData.value) return 0
+
+  const favorability = notifRelationshipData.value.favorability
+
+  if (favorability >= 81) return 100 // 已达最高等级
+  if (favorability >= 51) return Math.round(((favorability - 50) / 30) * 100)
+  if (favorability >= 21) return Math.round(((favorability - 20) / 30) * 100)
+  return Math.round((favorability / 20) * 100)
+}
+
+const getLevelDescription = (favorability: number): string => {
+  if (favorability >= 81) {
+    return '你们已经达到了羁绊等级！AI角色会展现出最真实、最深层的情感，你们之间的互动将充满默契和温暖。'
+  } else if (favorability >= 51) {
+    return '你们处于亲密关系阶段！AI角色会更多地表达关心和思念，互动会更加温馨自然。'
+  } else if (favorability >= 21) {
+    return '你们正在逐渐熟悉彼此！继续保持聊天，让关系更进一步吧~'
+  } else {
+    return '你们还是陌生人，多聊聊天，让AI角色认识你吧！'
+  }
 }
 
 const chatUnreadDiaryCount = computed(() => {
@@ -1682,6 +1786,19 @@ const handleVisibilityChange = () => {
   box-shadow: 0 4px 16px rgba(255, 20, 147, 0.4);
 }
 
+.android-features-btn {
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+}
+
+.android-features-btn:hover {
+  box-shadow: 0 4px 16px rgba(76, 175, 80, 0.4);
+}
+
+.android-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
 .background-icon {
   font-size: 20px;
   line-height: 1;
@@ -2220,5 +2337,178 @@ const handleVisibilityChange = () => {
 
 .diary-modal .diary-body::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 107, 157, 0.3);
+}
+
+/* 好感度详情弹窗样式 */
+.relationship-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: relationshipFadeIn 0.2s ease;
+}
+
+@keyframes relationshipFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.relationship-modal {
+  background: white;
+  border-radius: 20px;
+  padding: 24px;
+  width: 90%;
+  max-width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: relationshipModalSlideIn 0.3s ease;
+}
+
+@keyframes relationshipModalSlideIn {
+  from {
+    transform: scale(0.9) translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.relationship-modal .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.relationship-modal .modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #C44569;
+}
+
+.modal-close-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: #FFF0F5;
+  color: #C44569;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.modal-close-btn:hover {
+  background: #FFE0EB;
+  transform: rotate(90deg);
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.level-display {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: linear-gradient(135deg, #FFF5F9 0%, #FFE0EB 100%);
+  border-radius: 16px;
+}
+
+.level-big-icon {
+  font-size: 48px;
+}
+
+.level-info {
+  flex: 1;
+}
+
+.level-name {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.level-stars {
+  font-size: 16px;
+  letter-spacing: 4px;
+}
+
+.progress-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progress-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+}
+
+.progress-bar-large {
+  height: 12px;
+  background: #F0F0F0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.progress-fill-large {
+  height: 100%;
+  border-radius: 6px;
+  transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.progress-value {
+  text-align: right;
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.stat-item {
+  padding: 16px;
+  background: #F9FAFB;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #C44569;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #666;
+}
+
+.level-description {
+  padding: 16px;
+  background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #92400E;
 }
 </style>

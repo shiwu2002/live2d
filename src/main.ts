@@ -1,10 +1,10 @@
 import { createApp } from 'vue'
 import './style.css'
 import App from './App.vue'
-import { initCapacitor } from './utils/capacitor'
+import { initPlatform } from './utils/platform'
 
 async function bootstrap() {
-  await initCapacitor()
+  await initPlatform()
   createApp(App).mount('#app')
 }
 
