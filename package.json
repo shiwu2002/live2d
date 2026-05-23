@@ -10,27 +10,10 @@
         "scan-models": "node scripts/scan-models.js",
         "watch-models": "node scripts/watch-models.js",
         "electron:dev": "concurrently --kill-others \"npm run dev\" \"npm run watch-models\" \"wait-on http://localhost:5173 && electron .\"",
-        "electron:build": "vue-tsc -b && vite build --base=./ && electron-builder",
-        "cap:build": "vue-tsc -b && vite build",
-        "cap:sync": "npm run cap:build && npx cap sync",
-        "cap:open:android": "npx cap open android",
-        "cap:open:ios": "npx cap open ios",
-        "cap:add:android": "npx cap add android",
-        "cap:add:ios": "npx cap add ios",
-        "cap:run:android": "npm run cap:sync && npx cap run android",
-        "cap:run:ios": "npm run cap:sync && npx cap run ios"
+        "electron:build": "vue-tsc -b && vite build --base=./ && electron-builder"
     },
     "main": "electron/main.cjs",
     "dependencies": {
-        "@capacitor/android": "^8.3.4",
-        "@capacitor/app": "^8.1.0",
-        "@capacitor/browser": "^8.0.3",
-        "@capacitor/core": "^8.3.4",
-        "@capacitor/haptics": "^8.0.2",
-        "@capacitor/ios": "^8.3.4",
-        "@capacitor/share": "^8.0.1",
-        "@capacitor/splash-screen": "^8.0.1",
-        "@capacitor/status-bar": "^8.0.2",
         "@pixi/app": "^6.5.10",
         "@pixi/core": "^6.5.10",
         "@pixi/display": "^6.5.10",
@@ -43,7 +26,6 @@
         "vue": "^3.5.24"
     },
     "devDependencies": {
-        "@capacitor/cli": "^8.3.4",
         "@types/node": "^24.10.1",
         "@vitejs/plugin-vue": "^6.0.1",
         "@vue/tsconfig": "^0.8.1",

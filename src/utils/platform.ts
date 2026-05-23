@@ -1,14 +1,13 @@
-let _platform: 'web' | 'electron' | 'android' | 'ios' = 'web'
-let _isNativeApp = false
+let _platform: 'web' | 'electron' = 'web'
 let _isElectron = false
 
-export type Platform = 'web' | 'electron' | 'android' | 'ios'
+export type Platform = 'web' | 'electron'
 
 export const getPlatform = (): Platform => _platform
-export const isNativeApp = (): boolean => _isNativeApp
+export const isNativeApp = (): boolean => false
 export const isElectron = (): boolean => _isElectron
-export const isAndroid = (): boolean => _platform === 'android'
-export const isIOS = (): boolean => _platform === 'ios'
+export const isAndroid = (): boolean => false
+export const isIOS = (): boolean => false
 export const isWeb = (): boolean => _platform === 'web'
 
 async function detectPlatform(): Promise<void> {
@@ -18,79 +17,14 @@ async function detectPlatform(): Promise<void> {
     return
   }
 
-  try {
-    const { Capacitor } = await import('@capacitor/core')
-    _isNativeApp = Capacitor.isNativePlatform()
-    const platform = Capacitor.getPlatform()
-    if (platform === 'android' || platform === 'ios') {
-      _platform = platform
-    } else {
-      _platform = 'web'
-    }
-  } catch {
-    _platform = 'web'
-    _isNativeApp = false
-  }
+  _platform = 'web'
 }
 
 export async function initPlatform(): Promise<void> {
   await detectPlatform()
-
-  if (!_isNativeApp) return
-
-  try {
-    const { StatusBar, Style } = await import('@capacitor/status-bar')
-    await StatusBar.setStyle({ style: Style.Light })
-    await StatusBar.setBackgroundColor({ color: '#FFDEE9' })
-  } catch {
-  }
-
-  try {
-    const { SplashScreen } = await import('@capacitor/splash-screen')
-    await SplashScreen.hide()
-  } catch {
-  }
-
-  try {
-    const { App: CapApp } = await import('@capacitor/app')
-    CapApp.addListener('backButton', ({ canGoBack }: { canGoBack: boolean }) => {
-      if (!canGoBack) {
-        CapApp.exitApp()
-      } else {
-        window.history.back()
-      }
-    })
-  } catch {
-  }
-
-  if (_platform === 'ios') {
-    document.documentElement.style.setProperty('--safe-area-top', 'env(safe-area-inset-top)')
-    document.documentElement.style.setProperty('--safe-area-bottom', 'env(safe-area-inset-bottom)')
-  }
-
-  if (_platform === 'android') {
-    const meta = document.createElement('meta')
-    meta.name = 'viewport'
-    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover'
-    const existing = document.querySelector('meta[name="viewport"]')
-    if (existing) {
-      existing.replaceWith(meta)
-    } else {
-      document.head.appendChild(meta)
-    }
-  }
-
   console.log(`[Platform] Initialized on ${_platform}`)
 }
 
 export function getSafeAreaInsets(): { top: number; bottom: number; left: number; right: number } {
-  if (!_isNativeApp) return { top: 0, bottom: 0, left: 0, right: 0 }
-
-  const style = getComputedStyle(document.documentElement)
-  return {
-    top: parseInt(style.getPropertyValue('--sat') || '0', 10),
-    bottom: parseInt(style.getPropertyValue('--sab') || '0', 10),
-    left: parseInt(style.getPropertyValue('--sal') || '0', 10),
-    right: parseInt(style.getPropertyValue('--sar') || '0', 10),
-  }
+  return { top: 0, bottom: 0, left: 0, right: 0 }
 }

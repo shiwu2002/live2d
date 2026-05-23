@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { getEnvConfig } from '../config'
-import { isNativeApp } from '../utils/capacitor'
+import { isNativeApp } from '../utils/platform'
 
 export interface NotificationRelationshipData {
   favorability: number

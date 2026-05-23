@@ -149,7 +149,7 @@
 
     <div v-if="discoveredModels.length > 0" class="pet-container desktop-pet">
       <div class="background-board" :class="{ 'hidden': !showBackground }">
-        <div v-if="!isAndroidDevice" class="drag-handle-top-right" @mousedown="handleDragStart" title="拖拽移动窗口">
+        <div class="drag-handle-top-right" @mousedown="handleDragStart" title="拖拽移动窗口">
           <img src="./images/移动.png" class="drag-icon" alt="拖拽" />
         </div>
       </div>
@@ -220,15 +220,6 @@
             :title="showBackground ? '隐藏背景板' : '显示背景板'"
           >
             <span class="background-icon">🎨</span>
-          </button>
-
-          <button
-            v-if="isAndroidDevice"
-            class="control-btn android-features-btn"
-            @click="showAndroidPanel = true"
-            title="Android 专属功能"
-          >
-            <span class="android-icon">📱</span>
           </button>
 
           <div class="more-menu-wrapper">
@@ -377,10 +368,6 @@
       {{ preferenceMessage.text }}
     </div>
 
-    <AndroidFeaturePanel
-      v-if="showAndroidPanel"
-      @close="showAndroidPanel = false"
-    />
   </div>
 </template>
 
@@ -405,11 +392,11 @@ import type { Live2DAnimationCommand } from './types/live2d'
 import { authService } from './services/authService'
 import { setUnauthorizedHandler } from './services/httpClient'
 import { aiModelConfigService, aiModelSwitchService, type ModelConfig } from './services/aiModelConfig'
-import { isNativeApp, isAndroid, isElectron } from './utils/platform'
+import { isNativeApp, isElectron } from './utils/platform'
 import { getUserEngagementService, getFavorabilityLevel } from './services/userEngagement'
 import { notificationWs, type NotificationRelationshipData } from './services/notificationWebSocket'
 import { screenCaptureService } from './services/screenCapture'
-import AndroidFeaturePanel from './components/AndroidFeaturePanel.vue'
+
 
 import iconLogin from './images/zhanghudenglu-icon.png'
 import iconChat from './images/liaotian.png'
@@ -419,9 +406,6 @@ import iconMore from './images/gengduo.png'
 
 const isDesktop = ref(isElectron())
 const isMobileApp = ref(isNativeApp())
-const isAndroidDevice = ref(isAndroid())
-
-const showAndroidPanel = ref(false)
 
 const handleDragStart = (e: MouseEvent) => {
   console.log('handleDragStart called')
@@ -1784,19 +1768,6 @@ const handleVisibilityChange = () => {
 .background-btn.active {
   background: linear-gradient(135deg, #FF69B4 0%, #FF1493 100%);
   box-shadow: 0 4px 16px rgba(255, 20, 147, 0.4);
-}
-
-.android-features-btn {
-  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-}
-
-.android-features-btn:hover {
-  box-shadow: 0 4px 16px rgba(76, 175, 80, 0.4);
-}
-
-.android-icon {
-  font-size: 20px;
-  line-height: 1;
 }
 
 .background-icon {
