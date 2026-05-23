@@ -1251,25 +1251,15 @@ const handleVisibilityChange = () => {
 
 .pet-container {
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: min(85vw, 500px);
-  height: min(80vh, 700px);
-  background: rgba(255, 255, 255, 0.96);
-  border-radius: 20px;
-  box-shadow: 0 12px 48px rgba(255, 107, 157, 0.2);
-  backdrop-filter: blur(10px);
-  overflow: visible;
-  z-index: 1000;
-  transition: all 0.3s ease;
-  border: 1.5px solid rgba(255, 107, 157, 0.15);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
-}
-
-.pet-container:hover {
-  box-shadow: 0 16px 64px rgba(255, 107, 157, 0.3);
+  z-index: 10;
 }
 
 .background-board {
@@ -1310,16 +1300,12 @@ const handleVisibilityChange = () => {
   width: 100%;
   flex: 1 1 auto;
   min-height: 0;
-  background: linear-gradient(180deg, #FFF5F9 0%, #ffffff 100%);
   position: relative;
   overflow: hidden;
-  border-radius: 20px 20px 0 0;
 }
 
 .pet-toolbar {
   padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.96);
-  border-top: 1px solid #FFE0EB;
 }
 
 .toolbar-buttons {
@@ -1566,19 +1552,6 @@ const handleVisibilityChange = () => {
 }
 
 @media (max-width: 768px) {
-  .pet-container {
-    width: 100vw;
-    height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    bottom: 0;
-    right: 0;
-    top: 0;
-    left: 0;
-    border-radius: 0;
-    box-shadow: none;
-  }
-
   .pet-model-area {
     width: 100%;
     height: auto;
@@ -1590,13 +1563,11 @@ const handleVisibilityChange = () => {
   }
 
   .pet-toolbar {
-    position: static;
     margin: 8px 10px;
     padding: 10px;
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
     border-radius: 14px;
-    border: none;
   }
 
   .toolbar-buttons {
