@@ -4,26 +4,10 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Live2D 桌面端</title>
-    <!-- 加载 Live2D Cubism Core -->
+    <title>Live2D 桌宠</title>
     <script src="https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"></script>
-    <style>
-      /* 确保桌面应用启动时背景完全透明 */
-      html, body {
-        background: transparent !important;
-        background-color: #00000000 !important;
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
-      }
-
-      #app {
-        background: transparent !important;
-        background-color: transparent !important;
-      }
-    </style>
   </head>
-  <body style="background: transparent; background-color: transparent;">
+  <body>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

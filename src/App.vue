@@ -1,5 +1,5 @@
 <template>
-  <div class="app-container desktop-pet" :class="{ 'native-app': isMobileApp }">
+  <div class="app-container">
     <ChatWindow
       v-if="showChat"
       :ws-url="wsConfig.baseUrl"
@@ -147,13 +147,10 @@
       </div>
     </Teleport>
 
-    <div v-if="discoveredModels.length > 0" class="pet-container desktop-pet">
+    <div v-if="discoveredModels.length > 0" class="pet-container">
       <div class="background-board" :class="{ 'hidden': !showBackground }">
-        <div v-if="!isAndroidDevice" class="drag-handle-top-right" @mousedown="handleDragStart" title="拖拽移动窗口">
-          <img src="./images/移动.png" class="drag-icon" alt="拖拽" />
-        </div>
       </div>
-      <div class="pet-model-area desktop-pet">
+      <div class="pet-model-area">
         <Live2DModel
           v-if="modelPath"
           ref="live2dModelRef"
@@ -168,7 +165,7 @@
 
         <!-- 竖状好感度条（模型右上方） -->
         <div
-          class="relationship-bar-vertical desktop-pet"
+          class="relationship-bar-vertical"
           @click="handleShowRelationshipDetail"
           :title="notifRelationshipData ? `${notifRelationshipLevel.name} ${notifRelationshipData.favorability}/100` : '登录后显示好感度'"
         >
@@ -189,7 +186,7 @@
         </div>
       </div>
 
-      <div class="pet-toolbar desktop-pet">
+      <div class="pet-toolbar">
         <div class="toolbar-buttons">
           <button
             v-if="!isLoggedIn"
@@ -220,15 +217,6 @@
             :title="showBackground ? '隐藏背景板' : '显示背景板'"
           >
             <span class="background-icon">🎨</span>
-          </button>
-
-          <button
-            v-if="isAndroidDevice"
-            class="control-btn android-features-btn"
-            @click="showAndroidPanel = true"
-            title="Android 专属功能"
-          >
-            <span class="android-icon">📱</span>
           </button>
 
           <div class="more-menu-wrapper">
@@ -347,22 +335,6 @@
                 <span class="toggle-indicator">{{ autoPlayExpression ? '✓' : '' }}</span>
               </button>
               <div class="dropdown-divider"></div>
-              <button
-                class="dropdown-item"
-                @click="handleMinimize(); showMoreMenu = false"
-                title="最小化"
-              >
-                <span class="dropdown-emoji">➖</span>
-                <span>最小化</span>
-              </button>
-              <button
-                class="dropdown-item"
-                @click="handleQuit(); showMoreMenu = false"
-                title="退出"
-              >
-                <span class="dropdown-emoji">✕</span>
-                <span>退出</span>
-              </button>
             </div>
           </div>
         </div>
@@ -377,10 +349,6 @@
       {{ preferenceMessage.text }}
     </div>
 
-    <AndroidFeaturePanel
-      v-if="showAndroidPanel"
-      @close="showAndroidPanel = false"
-    />
   </div>
 </template>
 
@@ -405,11 +373,9 @@ import type { Live2DAnimationCommand } from './types/live2d'
 import { authService } from './services/authService'
 import { setUnauthorizedHandler } from './services/httpClient'
 import { aiModelConfigService, aiModelSwitchService, type ModelConfig } from './services/aiModelConfig'
-import { isNativeApp, isAndroid, isElectron } from './utils/platform'
 import { getUserEngagementService, getFavorabilityLevel } from './services/userEngagement'
 import { notificationWs, type NotificationRelationshipData } from './services/notificationWebSocket'
 import { screenCaptureService } from './services/screenCapture'
-import AndroidFeaturePanel from './components/AndroidFeaturePanel.vue'
 
 import iconLogin from './images/zhanghudenglu-icon.png'
 import iconChat from './images/liaotian.png'
@@ -417,45 +383,12 @@ import iconVoice from './images/a-yuyindianhuatongzhi48.png'
 import iconCharacter from './images/jiaoseguanlijiaoseshezhi.png'
 import iconMore from './images/gengduo.png'
 
-const isDesktop = ref(isElectron())
-const isMobileApp = ref(isNativeApp())
-const isAndroidDevice = ref(isAndroid())
 
-const showAndroidPanel = ref(false)
-
-const handleDragStart = (e: MouseEvent) => {
-  console.log('handleDragStart called')
-  const api = (window as any).electronAPI
-  if (!api) return
-  let startX = e.screenX || e.clientX
-  let startY = e.screenY || e.clientY
-  api.startDrag()
-  const onMove = (ev: MouseEvent) => {
-    api.dragMove(ev.screenX - startX, ev.screenY - startY)
-  }
-  const onUp = () => {
-    api.endDrag()
-    document.removeEventListener('mousemove', onMove)
-    document.removeEventListener('mouseup', onUp)
-  }
-  document.addEventListener('mousemove', onMove)
-  document.addEventListener('mouseup', onUp)
-}
-
-const handleMinimize = async () => {
-  await (window as any).electronAPI?.minimizeWindow()
-}
-
-const handleQuit = async () => {
-  await (window as any).electronAPI?.closeWindow()
-}
-
-// 模型信息接口
 interface ModelInfo {
   id: string
   name: string
   path: string
-  isValid?: boolean  // 文件验证状态
+  isValid?: boolean
 }
 
 const live2dModelRef = ref<InstanceType<typeof Live2DModel> | null>(null)
@@ -652,139 +585,13 @@ const toggleAutoPlayExpression = (enabled: boolean) => {
   }
 }
 
-// 鼠标穿透：状态缓存 + 启用防抖（禁用立即生效，启用延迟 250ms）
-let mousePenetrationListener: ((e: MouseEvent) => void) | null = null
-let lastIgnoreState: boolean | null = null
-let enableIgnoreTimer: ReturnType<typeof setTimeout> | null = null
-const ENABLE_IGNORE_DELAY_MS = 250
 
-// 检查是否有任何交互界面正在显示
-const hasActiveInteractiveUI = () => {
-  return (
-    showChat.value ||
-    showVoiceCall.value ||
-    showUserAuthModal.value ||
-    showCharacterSettings.value ||
-    showCustomModelManager.value ||
-    showMemoryUpload.value ||
-    showVoiceModelSettings.value ||
-    showLive2DModelManager.value ||
-    showMoreMenu.value ||
-    showDiaryPanel.value
-  )
-}
-
-const getApi = () => (window as any).electronAPI
-
-// 清除启用穿透的防抖定时器
-const clearEnableIgnoreTimer = () => {
-  if (enableIgnoreTimer) {
-    clearTimeout(enableIgnoreTimer)
-    enableIgnoreTimer = null
-  }
-}
-
-// 仅当穿透状态需改变时才调用（fire-and-forget）
-const applyMouseIgnore = (ignore: boolean) => {
-  if (ignore === lastIgnoreState) return
-  lastIgnoreState = ignore
-  getApi()?.setIgnoreMouseEvents?.(ignore, { forward: true })
-}
-
-// 根据鼠标 Y 坐标判断是否在工具栏区域（不穿透），底部 140px
-const isInToolbarZone = (y: number) => y > window.innerHeight - 140
-
-const syncMouseIgnore = (clientY: number) => {
-  const inToolbar = isInToolbarZone(clientY)
-  const hasUI = hasActiveInteractiveUI()
-
-  if (inToolbar || hasUI) {
-    // 进入工具栏区域 / 有 UI 打开 → 立即禁用穿透
-    clearEnableIgnoreTimer()
-    applyMouseIgnore(false)
-  } else {
-    // 离开工具栏区域且无 UI → 延迟启用穿透（防止从模型区快速滑向工具栏时误穿透）
-    if (!enableIgnoreTimer) {
-      enableIgnoreTimer = setTimeout(() => {
-        enableIgnoreTimer = null
-        // 再次确认鼠标仍在模型区域且无 UI
-        if (!hasActiveInteractiveUI()) {
-          applyMouseIgnore(true)
-        }
-      }, ENABLE_IGNORE_DELAY_MS)
-    }
-  }
-}
-
-// 切换背景板显示
 const toggleBackground = async () => {
   showBackground.value = !showBackground.value
   isBackgroundHidden.value = !showBackground.value
   console.log(`背景板: ${showBackground.value ? '显示' : '隐藏'}`)
-
-  if (isDesktop.value) {
-    const api = getApi()
-    if (isBackgroundHidden.value) {
-      // 背景隐藏：启动 mousemove 快速路径 + 主进程轮询安全网
-      if (!mousePenetrationListener) {
-        mousePenetrationListener = (e: MouseEvent) => syncMouseIgnore(e.clientY)
-        document.addEventListener('mousemove', mousePenetrationListener)
-      }
-      // 通知主进程启动轮询（安全网：不依赖渲染进程事件/焦点）
-      api?.setBackgroundHidden?.(true)
-      // 刚点击按钮，鼠标在工具栏区域 → 不穿透
-      applyMouseIgnore(false)
-    } else {
-      // 背景显示：停止主进程轮询，移除快速路径监听，关闭穿透
-      api?.setBackgroundHidden?.(false)
-      clearEnableIgnoreTimer()
-      if (mousePenetrationListener) {
-        document.removeEventListener('mousemove', mousePenetrationListener)
-        mousePenetrationListener = null
-      }
-      lastIgnoreState = null
-      applyMouseIgnore(false)
-    }
-  }
 }
 
-// 焦点管理：使用主进程 BrowserWindow blur/focus（快速恢复）
-// 失焦时（用户点击穿透到桌面）→ 立即关闭穿透
-// 主进程轮询作为安全网：即使此事件未触发，也会在 100ms 内修正穿透状态
-const onMainWindowBlurred = () => {
-  if (!isDesktop.value || !isBackgroundHidden.value) return
-  lastIgnoreState = null
-  applyMouseIgnore(false)
-}
-
-const onMainWindowFocused = () => {
-  if (!isDesktop.value || !isBackgroundHidden.value) return
-  if (hasActiveInteractiveUI()) {
-    applyMouseIgnore(false)
-    return
-  }
-  // 没有 UI 且背景隐藏：等 mousemove 同步正确穿透状态
-  // 不急于启用穿透，避免刚拿回焦点时误穿透
-}
-
-// 监听交互界面状态变化
-watch(
-  [showChat, showVoiceCall, showUserAuthModal, showCharacterSettings, showCustomModelManager, showMemoryUpload, showVoiceModelSettings, showLive2DModelManager, showMoreMenu, showDiaryPanel],
-  () => {
-    if (!isDesktop.value) return
-    const hasUI = hasActiveInteractiveUI()
-    // 通知主进程交互界面状态（让主进程轮询也考虑此状态）
-    getApi()?.setInteractiveUIActive?.(hasUI)
-    if (hasUI) {
-      applyMouseIgnore(false)
-      console.log('交互界面打开，已禁用穿透')
-    } else if (isBackgroundHidden.value && !mousePenetrationListener) {
-      // UI 全关且背景隐藏但没有监听 → 异常状态，启用穿透
-      applyMouseIgnore(true)
-    }
-    // 正常情况：UI 全关且背景隐藏 → mousemove 监听器会同步正确状态
-  }
-)
 
 // 用户登录状态
 const isLoggedIn = ref(false)
@@ -1371,62 +1178,16 @@ onMounted(async () => {
   }
 
   try {
-    // 初始化时加载远程 Live2D 模型列表
     await loadRemoteModels()
   } catch {
     console.warn('远程模型列表获取失败，使用本地模型')
   }
-
-  if (isDesktop.value) {
-    try {
-      const { width: cfgW, height: cfgH } = displayCfg.window
-      await (window as any).electronAPI?.setWindowSize(cfgW, cfgH)
-      console.log(`✅ 窗口大小已设置为 ${cfgW}x${cfgH}`)
-    } catch (e) {
-      console.warn('⚠️ 设置窗口大小失败:', e)
-    }
-    // 窗口焦点管理：使用主进程 BrowserWindow blur/focus（比渲染进程 window.blur 更可靠）
-    const api = getApi()
-    api?.onWindowBlurred?.(() => onMainWindowBlurred())
-    api?.onWindowFocused?.(() => onMainWindowFocused())
-  }
-
-  ;(async () => {
-    const style = document.createElement('style')
-    style.id = 'force-transparent-styles'
-    style.textContent = `
-      html, body, #app,
-      .app-container, .pet-container, .pet-model-area,
-      .live2d-container, canvas,
-      .app-container.desktop-pet,
-      .pet-container.desktop-pet,
-      .pet-model-area.desktop-pet {
-        background: transparent !important;
-        background-color: #00000000 !important;
-        background-image: none !important;
-        backdrop-filter: none !important;
-      }
-
-      .desktop-pet {
-        background: transparent !important;
-        background-color: transparent !important;
-        box-shadow: none !important;
-        border: none !important;
-      }
-    `
-    document.head.appendChild(style)
-  })()
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', updateIsMobile)
   document.removeEventListener('click', handleClickOutside)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
-  clearEnableIgnoreTimer()
-  if (mousePenetrationListener) {
-    document.removeEventListener('mousemove', mousePenetrationListener)
-    mousePenetrationListener = null
-  }
   if (autoMotionInterval) {
     clearInterval(autoMotionInterval)
     autoMotionInterval = null
@@ -1436,7 +1197,6 @@ onUnmounted(() => {
     autoExpressionInterval = null
   }
 
-  // 组件卸载时停止屏幕截图服务
   screenCaptureService.stop()
 })
 
@@ -1480,36 +1240,6 @@ const handleVisibilityChange = () => {
   background: linear-gradient(135deg, #FFDEE9 0%, #B5FFFC 100%);
 }
 
-.app-container.desktop-pet {
-  min-height: 100vh;
-  background: transparent !important;
-  overflow: auto;
-  overflow-x: hidden;
-  overscroll-behavior: contain;
-  display: flex;
-  flex-direction: column;
-}
-
-.app-container.desktop-pet::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.app-container.desktop-pet::-webkit-scrollbar-track {
-  background: rgba(255, 182, 193, 0.1);
-  border-radius: 3px;
-}
-
-.app-container.desktop-pet::-webkit-scrollbar-thumb {
-  background: rgba(255, 107, 157, 0.4);
-  border-radius: 3px;
-  transition: background 0.2s ease;
-}
-
-.app-container.desktop-pet::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 107, 157, 0.6);
-}
-
 .loading-tip {
   position: fixed;
   top: 50%;
@@ -1534,22 +1264,6 @@ const handleVisibilityChange = () => {
 
 .pet-container:hover {
   box-shadow: 0 16px 64px rgba(255, 107, 157, 0.3);
-}
-
-.pet-container.desktop-pet {
-  background: transparent !important;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-  backdrop-filter: none;
-  overflow: visible;
-  width: auto;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  align-items: center;
-  position: relative;
 }
 
 .background-board {
@@ -1605,56 +1319,6 @@ const handleVisibilityChange = () => {
   pointer-events: none;
 }
 
-.drag-handle-top-right {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-  cursor: grab;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(8px);
-  transition: all 0.3s ease;
-  -webkit-app-region: drag;
-  -webkit-user-select: none;
-  user-select: none;
-  border: 1.5px solid rgba(255, 107, 157, 0.2);
-}
-
-.drag-handle-top-right:hover {
-  background: rgba(255, 255, 255, 0.5);
-  transform: scale(1.1);
-  box-shadow: 0 4px 16px rgba(255, 107, 157, 0.2);
-}
-
-.drag-handle-top-right:active {
-  cursor: grabbing;
-  transform: scale(0.95);
-}
-
-.drag-handle-top-right .drag-icon {
-  width: 24px;
-  height: 24px;
-  display: block;
-  opacity: 0.8;
-  filter: brightness(0) saturate(100%) invert(60%) sepia(30%) saturate(500%) hue-rotate(320deg) brightness(90%);
-  transition: all 0.3s ease;
-}
-
-.drag-handle-top-right:hover .drag-icon {
-  opacity: 1;
-  filter: brightness(0) saturate(100%) invert(50%) sepia(40%) saturate(600%) hue-rotate(330deg) brightness(95%);
-}
-
-.pet-container.desktop-pet:hover {
-  box-shadow: none;
-}
-
 .pet-model-area {
   width: 100%;
   height: 400px;
@@ -1664,52 +1328,10 @@ const handleVisibilityChange = () => {
   border-radius: 20px 20px 0 0;
 }
 
-.pet-model-area.desktop-pet {
-  flex: 1;
-  width: 100vw;
-  min-height: calc(100vh - 120px);
-  height: auto;
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  cursor: default;
-  position: relative;
-  z-index: 1;
-}
-
-.pet-model-area.desktop-pet:active {
-  cursor: grabbing;
-}
-
 .pet-toolbar {
   padding: 12px 14px;
   background: rgba(255, 255, 255, 0.96);
   border-top: 1px solid #FFE0EB;
-}
-
-.pet-toolbar.desktop-pet {
-  position: fixed;
-  bottom: 26px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(16px);
-  border-radius: 20px;
-  border: 1px solid rgba(255, 107, 157, 0.15);
-  padding: 8px 12px;
-  box-shadow: 0 8px 32px rgba(255, 107, 157, 0.15);
-  z-index: 1001;
-  opacity: 0.3;
-  transition: opacity 0.3s ease;
-  -webkit-app-region: no-drag;
-}
-
-.pet-toolbar.desktop-pet * {
-  -webkit-app-region: no-drag;
-}
-
-.pet-toolbar.desktop-pet:hover {
-  opacity: 1;
 }
 
 .toolbar-buttons {
@@ -1717,11 +1339,6 @@ const handleVisibilityChange = () => {
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
-}
-
-.pet-toolbar.desktop-pet .toolbar-buttons {
-  flex-wrap: nowrap;
-  gap: 8px;
 }
 
 .control-btn {
@@ -1749,24 +1366,12 @@ const handleVisibilityChange = () => {
   transform: translateY(0) scale(0.98);
 }
 
-.pet-toolbar.desktop-pet .control-btn {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(255, 107, 157, 0.2);
-}
-
 .btn-icon {
   width: 24px;
   height: 24px;
   object-fit: contain;
   pointer-events: none;
   filter: brightness(0) invert(1);
-}
-
-.pet-toolbar.desktop-pet .btn-icon {
-  width: 20px;
-  height: 20px;
 }
 
 .login-btn {
@@ -1784,19 +1389,6 @@ const handleVisibilityChange = () => {
 .background-btn.active {
   background: linear-gradient(135deg, #FF69B4 0%, #FF1493 100%);
   box-shadow: 0 4px 16px rgba(255, 20, 147, 0.4);
-}
-
-.android-features-btn {
-  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-}
-
-.android-features-btn:hover {
-  box-shadow: 0 4px 16px rgba(76, 175, 80, 0.4);
-}
-
-.android-icon {
-  font-size: 20px;
-  line-height: 1;
 }
 
 .background-icon {
@@ -2038,15 +1630,6 @@ const handleVisibilityChange = () => {
   .relationship-bar-vertical {
     display: none;
   }
-}
-
-.app-container.native-app {
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-.app-container.native-app .pet-toolbar.desktop-pet {
-  bottom: calc(26px + env(safe-area-inset-bottom));
 }
 
 /* 竖状好感度条（模型右上方） */

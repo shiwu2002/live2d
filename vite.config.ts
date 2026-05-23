@@ -1,26 +1,13 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-const host = process.env.TAURI_DEV_HOST
-
 export default defineConfig({
   plugins: [vue()],
-  base: (process.env.TAURI_ENV_PLATFORM || process.env.CAPACITOR) ? './' : '/live2d/',
+  base: '/live2d/',
 
   server: {
     port: 5173,
     strictPort: false,
-    host: host || false,
-    hmr: host
-      ? {
-          protocol: 'ws',
-          host,
-          port: 5174,
-        }
-      : undefined,
-    watch: {
-      ignored: ['**/src-tauri/**'],
-    },
     proxy: {
       '/api': {
         target: 'http://localhost:8080',
@@ -81,7 +68,7 @@ export default defineConfig({
   },
 
   build: {
-    target: process.env.TAURI_ENV_PLATFORM ? 'chrome105' : 'es2020',
+    target: 'es2020',
     sourcemap: false,
     minify: 'esbuild',
     chunkSizeWarningLimit: 2000,

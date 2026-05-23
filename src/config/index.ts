@@ -3,7 +3,7 @@
  * 管理所有服务的地址和配置
  */
 
-import { isNativeApp } from '../utils/capacitor'
+import { isNativeApp } from '../utils/platform'
 
 // ==================== 类型定义 ====================
 
