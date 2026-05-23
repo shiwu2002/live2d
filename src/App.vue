@@ -1536,6 +1536,7 @@ const handleVisibilityChange = () => {
   width: 100vw;
   height: 100vh;
   background: linear-gradient(135deg, #FFB6C1 0%, #FFC0CB 50%, #FFCCD5 100%);
+  border-radius: 24px;
   z-index: 0;
   transition: all 0.3s ease;
   overflow: hidden;
