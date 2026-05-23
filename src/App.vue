@@ -147,9 +147,9 @@
       </div>
     </Teleport>
 
+    <div v-if="discoveredModels.length > 0" class="background-board" :class="{ 'hidden': !showBackground }"></div>
+
     <div v-if="discoveredModels.length > 0" class="pet-container">
-      <div class="background-board" :class="{ 'hidden': !showBackground }">
-      </div>
       <div class="pet-model-area">
         <Live2DModel
           v-if="modelPath"
@@ -1251,10 +1251,11 @@ const handleVisibilityChange = () => {
 
 .pet-container {
   position: fixed;
-  width: 320px;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  width: min(85vw, 500px);
+  height: min(80vh, 700px);
   background: rgba(255, 255, 255, 0.96);
   border-radius: 20px;
   box-shadow: 0 12px 48px rgba(255, 107, 157, 0.2);
@@ -1263,6 +1264,8 @@ const handleVisibilityChange = () => {
   z-index: 1000;
   transition: all 0.3s ease;
   border: 1.5px solid rgba(255, 107, 157, 0.15);
+  display: flex;
+  flex-direction: column;
 }
 
 .pet-container:hover {
@@ -1270,47 +1273,30 @@ const handleVisibilityChange = () => {
 }
 
 .background-board {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
+  width: 100vw;
+  height: 100vh;
   background: linear-gradient(135deg, #FFB6C1 0%, #FFC0CB 50%, #FFCCD5 100%);
-  border-radius: 20px;
   z-index: 0;
   transition: all 0.3s ease;
   overflow: hidden;
+  pointer-events: none;
 }
 
 .background-board::before {
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 20px;
-  padding: 6px;
-  background:
-    linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.4) 0%,
-      transparent 50%
-    );
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
   pointer-events: none;
 }
 
 .background-board::after {
   content: '';
   position: absolute;
-  inset: 8px;
-  border-radius: 12px;
-  border: 1.5px solid rgba(255, 255, 255, 0.5);
-  box-shadow:
-    inset 0 2px 8px rgba(255, 182, 193, 0.15),
-    inset 0 -2px 8px rgba(255, 240, 245, 0.25);
   pointer-events: none;
 }
 
@@ -1322,7 +1308,8 @@ const handleVisibilityChange = () => {
 
 .pet-model-area {
   width: 100%;
-  height: 400px;
+  flex: 1 1 auto;
+  min-height: 0;
   background: linear-gradient(180deg, #FFF5F9 0%, #ffffff 100%);
   position: relative;
   overflow: hidden;
@@ -1635,9 +1622,9 @@ const handleVisibilityChange = () => {
 
 /* 竖状好感度条（模型右上方） */
 .relationship-bar-vertical {
-  position: fixed;
-  right: calc(50% - 140px);
-  top: 12%;
+  position: absolute;
+  right: 10px;
+  top: 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
