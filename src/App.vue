@@ -1,5 +1,5 @@
 <template>
-  <div class="app-container desktop-pet" :class="{ 'native-app': isMobileApp }">
+  <div class="app-container" :class="{ 'desktop-pet': isDesktop, 'native-app': isMobileApp }">
     <ChatWindow
       v-if="showChat"
       :ws-url="wsConfig.baseUrl"
@@ -147,28 +147,27 @@
       </div>
     </Teleport>
 
-    <div v-if="discoveredModels.length > 0" class="pet-container desktop-pet">
+    <div v-if="discoveredModels.length > 0" class="pet-container" :class="{ 'desktop-pet': isDesktop }">
       <div class="background-board" :class="{ 'hidden': !showBackground }">
-        <div class="drag-handle-top-right" @mousedown="handleDragStart" title="拖拽移动窗口">
+        <div v-if="isDesktop" class="drag-handle-top-right" @mousedown="handleDragStart" title="拖拽移动窗口">
           <img src="./images/移动.png" class="drag-icon" alt="拖拽" />
         </div>
       </div>
-      <div class="pet-model-area desktop-pet">
+      <div class="pet-model-area" :class="{ 'desktop-pet': isDesktop }">
         <Live2DModel
           v-if="modelPath"
           ref="live2dModelRef"
           :key="currentModel"
           :modelPath="modelPath"
           :modelId="currentModel"
-          :width="widgetWidth"
-          :height="widgetHeight"
           @loaded="handleLive2DModelLoaded"
           @error="handleLive2DModelError"
         />
 
         <!-- 竖状好感度条（模型右上方） -->
         <div
-          class="relationship-bar-vertical desktop-pet"
+          class="relationship-bar-vertical"
+          :class="{ 'desktop-pet': isDesktop }"
           @click="handleShowRelationshipDetail"
           :title="notifRelationshipData ? `${notifRelationshipLevel.name} ${notifRelationshipData.favorability}/100` : '登录后显示好感度'"
         >
@@ -189,7 +188,7 @@
         </div>
       </div>
 
-      <div class="pet-toolbar desktop-pet">
+      <div class="pet-toolbar" :class="{ 'desktop-pet': isDesktop }">
         <div class="toolbar-buttons">
           <button
             v-if="!isLoggedIn"
@@ -1375,7 +1374,7 @@ onMounted(async () => {
     api?.onWindowFocused?.(() => onMainWindowFocused())
   }
 
-  ;(async () => {
+  if (isDesktop.value) {
     const style = document.createElement('style')
     style.id = 'force-transparent-styles'
     style.textContent = `
@@ -1399,7 +1398,7 @@ onMounted(async () => {
       }
     `
     document.head.appendChild(style)
-  })()
+  }
 })
 
 onUnmounted(() => {
@@ -1505,35 +1504,27 @@ const handleVisibilityChange = () => {
 
 .pet-container {
   position: fixed;
-  width: 320px;
-  background: rgba(255, 255, 255, 0.96);
-  border-radius: 20px;
-  box-shadow: 0 12px 48px rgba(255, 107, 157, 0.2);
-  backdrop-filter: blur(10px);
-  overflow: visible;
-  z-index: 1000;
-  transition: all 0.3s ease;
-  border: 1.5px solid rgba(255, 107, 157, 0.15);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
 }
 
 .pet-container:hover {
-  box-shadow: 0 16px 64px rgba(255, 107, 157, 0.3);
+  box-shadow: none;
 }
 
 .pet-container.desktop-pet {
   background: transparent !important;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-  backdrop-filter: none;
-  overflow: visible;
-  width: auto;
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  align-items: center;
   position: relative;
+  z-index: 10;
+  overflow: visible;
 }
 
 .background-board {
@@ -1545,41 +1536,22 @@ const handleVisibilityChange = () => {
   width: 100vw;
   height: 100vh;
   background: linear-gradient(135deg, #FFB6C1 0%, #FFC0CB 50%, #FFCCD5 100%);
-  border-radius: 20px;
   z-index: 0;
   transition: all 0.3s ease;
   overflow: hidden;
+  pointer-events: none;
 }
 
 .background-board::before {
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 20px;
-  padding: 6px;
-  background:
-    linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.4) 0%,
-      transparent 50%
-    );
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
   pointer-events: none;
 }
 
 .background-board::after {
   content: '';
   position: absolute;
-  inset: 8px;
-  border-radius: 12px;
-  border: 1.5px solid rgba(255, 255, 255, 0.5);
-  box-shadow:
-    inset 0 2px 8px rgba(255, 182, 193, 0.15),
-    inset 0 -2px 8px rgba(255, 240, 245, 0.25);
   pointer-events: none;
 }
 
@@ -1635,30 +1607,21 @@ const handleVisibilityChange = () => {
   filter: brightness(0) saturate(100%) invert(50%) sepia(40%) saturate(600%) hue-rotate(330deg) brightness(95%);
 }
 
-.pet-container.desktop-pet:hover {
-  box-shadow: none;
-}
-
 .pet-model-area {
   width: 100%;
-  height: 400px;
-  background: linear-gradient(180deg, #FFF5F9 0%, #ffffff 100%);
+  flex: 1 1 auto;
+  min-height: 0;
   position: relative;
   overflow: hidden;
-  border-radius: 20px 20px 0 0;
 }
 
 .pet-model-area.desktop-pet {
   flex: 1;
   width: 100vw;
-  min-height: calc(100vh - 120px);
-  height: auto;
   background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  cursor: default;
   position: relative;
   z-index: 1;
+  cursor: default;
 }
 
 .pet-model-area.desktop-pet:active {
@@ -1667,8 +1630,6 @@ const handleVisibilityChange = () => {
 
 .pet-toolbar {
   padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.96);
-  border-top: 1px solid #FFE0EB;
 }
 
 .pet-toolbar.desktop-pet {
@@ -1957,31 +1918,7 @@ const handleVisibilityChange = () => {
 }
 
 @media (max-width: 768px) {
-  .pet-container {
-    width: 100vw;
-    height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    bottom: 0;
-    right: 0;
-    top: 0;
-    left: 0;
-    border-radius: 0;
-    box-shadow: none;
-  }
-
-  .pet-model-area {
-    width: 100%;
-    height: auto;
-    position: relative;
-    left: 0;
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: hidden;
-  }
-
   .pet-toolbar {
-    position: static;
     margin: 8px 10px;
     padding: 10px;
     background: rgba(255, 255, 255, 0.95);
@@ -2022,9 +1959,9 @@ const handleVisibilityChange = () => {
 
 /* 竖状好感度条（模型右上方） */
 .relationship-bar-vertical {
-  position: fixed;
-  right: calc(50% - 140px);
-  top: 12%;
+  position: absolute;
+  right: 10px;
+  top: 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
