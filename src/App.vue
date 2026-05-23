@@ -1252,6 +1252,9 @@ const handleVisibilityChange = () => {
 .pet-container {
   position: fixed;
   width: 320px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   background: rgba(255, 255, 255, 0.96);
   border-radius: 20px;
   box-shadow: 0 12px 48px rgba(255, 107, 157, 0.2);
@@ -1267,13 +1270,11 @@ const handleVisibilityChange = () => {
 }
 
 .background-board {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  width: 100vw;
-  height: 100vh;
   background: linear-gradient(135deg, #FFB6C1 0%, #FFC0CB 50%, #FFCCD5 100%);
   border-radius: 20px;
   z-index: 0;
