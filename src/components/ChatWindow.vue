@@ -1145,6 +1145,9 @@ watch(() => props.visible, (newVal) => {
     // 打开时重新连接
     initializeServices()
   }
+  if (newVal) {
+    nextTick(() => scrollToBottom())
+  }
 })
 
 // 生命周期
@@ -1389,13 +1392,13 @@ defineExpose({
 }
 
 .image-message-wrapper {
-  max-width: 4%;
-  max-height: 120px;
+  max-width:50%;
+  max-height: 150px;
 }
 
 .image-direct {
   width: 100%;
-  max-height: 120px;
+  max-height: 160px;
   object-fit: contain;
   border-radius: 10px;
   cursor: pointer;
