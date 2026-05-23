@@ -335,6 +335,7 @@ const imageLightboxUrl = ref<string>('')
 const isLoadingHistory = ref(false)
 const hasMoreHistory = ref(true)
 const historyNextId = ref<number | undefined>(undefined)
+let isFirstHistoryLoad = true
 
 // 新增：用户粘性功能相关状态
 const relationshipData = computed<RelationshipData | null>(() => {
@@ -467,11 +468,8 @@ const initializeServices = async () => {
 
     console.log('聊天服务初始化成功')
 
-    // 加载历史记录
-    await loadHistory()
-
-    // 历史加载完成后滚动到底部
-    nextTick(() => scrollToBottom())
+    // 加载历史记录（异步，不阻塞初始化，首次完成后自动滚动到底部）
+    loadHistory()
 
     // 新增：加载用户粘性数据（好感度和未读日记）
     await loadUserEngagementData()
@@ -527,6 +525,11 @@ const loadHistory = async () => {
 
     historyNextId.value = page.nextId ?? undefined
     if (!page.nextId) hasMoreHistory.value = false
+
+    if (isFirstHistoryLoad) {
+      isFirstHistoryLoad = false
+      nextTick(() => scrollToBottom())
+    }
   } catch (error) {
     console.error('加载聊天历史失败:', error)
   } finally {
