@@ -49,16 +49,6 @@ export default defineConfig({
           })
         }
       },
-      '/model': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        rewrite: (path) => path,
-        configure: (proxy) => {
-          proxy.on('proxyReq', (proxyReq) => {
-            proxyReq.removeHeader('origin')
-          })
-        }
-      },
       '/ws': {
         target: 'http://localhost:8080',
         changeOrigin: true,

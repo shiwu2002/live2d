@@ -290,7 +290,6 @@ const initPixiApp = () => {
     preserveDrawingBuffer: false,
     autoDensity: true,
     resolution: window.devicePixelRatio || 1,
-    transparent: true,
   })
 
   // 强制设置 canvas 透明
