@@ -1991,6 +1991,10 @@ const handleVisibilityChange = () => {
   transform: scale(0.96);
   transition-duration: 0.1s;
 }
+.relationship-bar-vertical.desktop-pet {
+  right: 16px;
+  top: 70px;
+}
 .rv-icon {
   font-size: 16px;
   line-height: 1;
